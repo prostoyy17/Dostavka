@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1793790465';
+const BUILD = '1793790530';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -18,7 +18,6 @@ const state = {
   cart: LS.get('cart', {}),
   favs: LS.get('favs', []),              // ordered list, newest first
   orders: LS.get('orders', []),
-  promo: LS.get('promo', null),
   address: LS.get('address', {}),
   theme: LS.get('theme', null),
   route: 'catalog',
@@ -38,7 +37,7 @@ const ic = (name, cls = 'ic') => `<img class="${cls}" src="assets/icons/${name}.
 const isFav = id => state.favs.includes(id);
 const save = () => {
   LS.set('cart', state.cart); LS.set('favs', state.favs); LS.set('orders', state.orders);
-  LS.set('promo', state.promo); LS.set('point', state.point); LS.set('mode', state.mode);
+  LS.set('point', state.point); LS.set('mode', state.mode);
 };
 const point = () => POINTS.find(p => p.id === state.point);
 const stockOf = (p, pid = state.point) => pid ? p.stock[pid] : 99;
@@ -58,7 +57,7 @@ applyTheme();
 function cartLines() {
   return Object.entries(state.cart).filter(([id]) => byId[id]).map(([id, qty]) => {
     const p = byId[id], avail = stockOf(p);
-    return { p, qty, avail, ok: avail >= qty && avail > 0, sum: p.price * qty, oldSum: (p.oldPrice || p.price) * qty };
+    return { p, qty, avail, ok: avail >= qty && avail > 0, sum: p.price * qty };
   });
 }
 function totals() {
@@ -66,21 +65,12 @@ function totals() {
   const okLines = lines.filter(l => l.ok);
   const count = lines.reduce((s, l) => s + l.qty, 0);
   const subtotal = okLines.reduce((s, l) => s + l.sum, 0);
-  const saved = okLines.reduce((s, l) => s + (l.oldSum - l.sum), 0);
   const pt = point() || POINTS[0];
-  let discount = 0, freeDelivery = false, promoErr = null;
-  if (state.promo) {
-    const pr = PROMOS[state.promo];
-    if (subtotal < pr.min) promoErr = `от ${rub(pr.min)}`;
-    else if (pr.type === 'percent') discount = Math.round(subtotal * pr.value / 100);
-    else if (pr.type === 'fixed') discount = Math.min(pr.value, subtotal);
-    else if (pr.type === 'delivery') freeDelivery = true;
-  }
   const isPickup = state.mode === 'pickup';
-  const delivery = isPickup || freeDelivery || subtotal >= pt.freeFrom || subtotal === 0 ? 0 : pt.deliveryFee;
+  const delivery = isPickup || subtotal >= pt.freeFrom || subtotal === 0 ? 0 : pt.deliveryFee;
   const service = subtotal > 0 ? 19 : 0;
-  const total = Math.max(0, subtotal - discount) + delivery + service;
-  return { lines, okLines, count, subtotal, saved, discount, delivery, service, total, pt, minOk: subtotal >= pt.minOrder, promoErr, isPickup, toFree: Math.max(0, pt.freeFrom - subtotal) };
+  const total = subtotal + delivery + service;
+  return { lines, okLines, count, subtotal, delivery, service, total, pt, minOk: subtotal >= pt.minOrder, isPickup, toFree: Math.max(0, pt.freeFrom - subtotal) };
 }
 
 function setQty(id, qty) {
@@ -110,8 +100,6 @@ function actionHTML(p, size = '') {
 }
 function tagsHTML(p) {
   const t = [];
-  if (p.oldPrice) t.push(`<span class="tag tag--sale">−${Math.round((1 - p.price / p.oldPrice) * 100)}%</span>`);
-  if (p.tags.includes('hit')) t.push('<span class="tag tag--hit">Хит</span>');
   if (p.tags.includes('halal')) t.push('<span class="tag tag--halal">Халяль</span>');
   else if (p.tags.includes('local')) t.push('<span class="tag tag--local">Местное</span>');
   return t.slice(0, 2).join('');
@@ -125,8 +113,7 @@ function cardHTML(p) {
     </div>
     <button class="fav-btn ${isFav(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="В избранное">${heart}</button>
     <div class="card__price">
-      <span class="price ${p.oldPrice ? 'price--sale' : ''}">${rub(p.price)}</span>
-      ${p.oldPrice ? `<span class="price-old">${rub(p.oldPrice)}</span>` : ''}
+      <span class="price">${rub(p.price)}</span>
     </div>
     <div class="card__name" data-open="${p.id}">${p.name}</div>
     <div class="card__unit"><span>${p.unit}</span>${state.point && s > 0 && s <= 5 ? `<span class="card__low">осталось ${s}</span>` : ''}</div>
@@ -163,7 +150,6 @@ function filtered() {
   const list = PRODUCTS.filter(p => {
     if (state.cat !== 'all' && p.cat !== state.cat) return false;
     if (q && !(p.name.toLowerCase().includes(q) || catById[p.cat].name.toLowerCase().includes(q))) return false;
-    if (state.filters.has('sale') && !p.oldPrice) return false;
     if (state.filters.has('halal') && !p.tags.includes('halal')) return false;
     if (state.filters.has('local') && !p.tags.includes('local')) return false;
     if (state.filters.has('instock') && stockOf(p) === 0) return false;
@@ -172,12 +158,10 @@ function filtered() {
   return sortList(list, state.sort);
 }
 function sortList(list, sort) {
-  const disc = p => p.oldPrice ? 1 - p.price / p.oldPrice : 0;
   const sorters = {
     pop: (a, b) => b.popularity - a.popularity,
     asc: (a, b) => a.price - b.price,
     desc: (a, b) => b.price - a.price,
-    sale: (a, b) => disc(b) - disc(a),
     name: (a, b) => a.name.localeCompare(b.name, 'ru'),
     added: () => 0
   };
@@ -185,27 +169,20 @@ function sortList(list, sort) {
 }
 const sortSelect = (id, val, extra = '') => `<select class="select" id="${id}">
   ${extra}
-  ${[['pop', 'Популярные'], ['asc', 'Сначала дешевле'], ['desc', 'Сначала дороже'], ['sale', 'По скидке'], ['name', 'По названию']].map(([v, l]) => `<option value="${v}" ${val === v ? 'selected' : ''}>${l}</option>`).join('')}
+  ${[['pop', 'Популярные'], ['asc', 'Сначала дешевле'], ['desc', 'Сначала дороже'], ['name', 'По названию']].map(([v, l]) => `<option value="${v}" ${val === v ? 'selected' : ''}>${l}</option>`).join('')}
 </select>`;
 
 function renderCatalogPage() {
   const page = $('#page');
   const title = state.query ? `Поиск «${state.query}»` : state.cat === 'all' ? 'Все товары' : catById[state.cat].name;
-  const showBanners = state.cat === 'all' && !state.query;
   page.innerHTML = `
-    ${showBanners ? `<section class="banners">${BANNERS.map((b, i) => `
-      <button class="banner" style="background:${b.bg}" data-banner="${i}">
-        <span class="banner__title">${b.title}</span>
-        <span class="banner__sub">${b.sub}</span>
-        ${ic(b.icon, 'banner__icon')}
-      </button>`).join('')}</section>` : ''}
     <div class="cat-strip" id="catStrip"></div>
     <div class="toolbar">
       <h1 class="toolbar__title">${title}</h1>
       <div class="toolbar__controls">${sortSelect('sortSelect', state.sort)}</div>
     </div>
     <div class="filters">
-      ${[['sale', '% Скидки'], ['halal', 'Халяль'], ['local', 'Местное'], ['instock', 'В наличии']].map(([f, l]) => `<button class="chip ${state.filters.has(f) ? 'active' : ''}" data-filter="${f}">${l}</button>`).join('')}
+      ${[['halal', 'Халяль'], ['local', 'Местное'], ['instock', 'В наличии']].map(([f, l]) => `<button class="chip ${state.filters.has(f) ? 'active' : ''}" data-filter="${f}">${l}</button>`).join('')}
     </div>
     <div id="catalog"></div>`;
   renderCatStrip();
@@ -223,8 +200,7 @@ function renderCatalog() {
   const grouped = state.cat === 'all' && !state.query && state.sort === 'pop' && !state.filters.size;
   if (!grouped) { root.innerHTML = `<div class="grid">${list.map(cardHTML).join('')}</div>`; return; }
 
-  const deals = PRODUCTS.filter(p => p.oldPrice && stockOf(p) > 0).sort((a, b) => (b.oldPrice - b.price) / b.oldPrice - (a.oldPrice - a.price) / a.oldPrice).slice(0, 4);
-  let html = `<section class="section"><div class="section__head"><h2 class="section__title">${ic('fire', '')}Скидки дня</h2><button class="section__more" data-chip="sale">Все скидки</button></div><div class="grid">${deals.map(cardHTML).join('')}</div></section>`;
+  let html = '';
   CATEGORIES.forEach(c => {
     const items = list.filter(p => p.cat === c.id);
     html += `<section class="section"><div class="section__head"><h2 class="section__title">${ic(c.icon, '')}${c.name}</h2><button class="section__more" data-cat="${c.id}">Все ${items.length}</button></div><div class="grid">${items.slice(0, 8).map(cardHTML).join('')}</div></section>`;
@@ -430,19 +406,15 @@ function cartHTML(inDrawer) {
           <div>
             <div class="cart-item__name">${l.p.name}</div>
             <div class="cart-item__meta">${l.p.unit}</div>
-            ${l.ok ? `<div class="cart-item__price">${rub(l.sum)}${l.p.oldPrice ? `<span class="price-old">${rub(l.oldSum)}</span>` : ''}</div>`
+            ${l.ok ? `<div class="cart-item__price">${rub(l.sum)}</div>`
               : `<div class="cart-item__warn">${l.avail ? `Осталось ${l.avail} шт` : 'Нет в наличии'}</div>`}
           </div>
           <div data-action-for="${l.p.id}" data-size="stepper--sm stepper--soft">${l.avail ? actionHTML(l.p, 'stepper--sm stepper--soft') : `<button class="cart__clear" data-remove="${l.p.id}">Удалить</button>`}</div>
         </div>`).join('')}
     </div>
     <div class="cart__foot">
-      ${state.promo ? `<div class="promo-applied"><span>${state.promo} · ${t.promoErr ? 'действует ' + t.promoErr : PROMOS[state.promo].label}</span><button data-action="remove-promo" aria-label="Убрать">×</button></div>`
-        : `<form class="promo" data-promo-form><input name="code" placeholder="Промокод" autocomplete="off"><button class="btn btn--ghost btn--sm" style="height:42px">Применить</button></form>`}
       <div class="totals">
-        <div class="totals__row"><span>Товары, ${t.count} шт</span><b>${rub(t.subtotal + t.saved)}</b></div>
-        ${t.saved ? `<div class="totals__row totals__row--discount"><span>Скидка</span><b>−${rub(t.saved)}</b></div>` : ''}
-        ${t.discount ? `<div class="totals__row totals__row--discount"><span>Промокод</span><b>−${rub(t.discount)}</b></div>` : ''}
+        <div class="totals__row"><span>Товары, ${t.count} шт</span><b>${rub(t.subtotal)}</b></div>
         <div class="totals__row"><span>${t.isPickup ? 'Самовывоз' : 'Доставка'}</span><b>${t.delivery ? rub(t.delivery) : 'Бесплатно'}</b></div>
         <div class="totals__row"><span>Сборка</span><b>${rub(t.service)}</b></div>
         <div class="totals__row totals__row--total"><span>Итого</span><b>${rub(t.total)}</b></div>
@@ -465,14 +437,6 @@ function renderCart() {
   }
   $$('[data-cart-total]').forEach(el => el.textContent = t.count ? rub(t.total) : 'Корзина');
   $$('[data-cart-count]').forEach(el => { el.hidden = !t.count; el.textContent = t.count; });
-}
-
-function applyPromo(code) {
-  code = code.trim().toUpperCase();
-  if (!code) return;
-  if (!PROMOS[code]) { toast('Промокод не найден'); return; }
-  state.promo = code; save(); renderCart();
-  toast(`Промокод ${code} применён`);
 }
 
 /* ================= Product modal ================= */
@@ -498,8 +462,7 @@ function openProduct(id) {
         </div>
         <div class="pm__buy">
           <div>
-            <div class="price ${p.oldPrice ? 'price--sale' : ''}">${rub(p.price)}</div>
-            ${p.oldPrice ? `<div class="price-old">${rub(p.oldPrice)}</div>` : ''}
+            <div class="price">${rub(p.price)}</div>
           </div>
           <div data-action-for="${p.id}" data-size="primary">${actionHTML(p, 'primary')}</div>
           <button class="pm__fav ${isFav(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="В избранное">${heart}</button>
@@ -604,9 +567,7 @@ function openCheckout() {
     const tt = totals();
     const sum = tt.total + (pickup ? 0 : f.tip);
     $('#checkoutTotals').innerHTML = `
-      <div class="totals__row"><span>Товары</span><b>${rub(tt.subtotal + tt.saved)}</b></div>
-      ${tt.saved ? `<div class="totals__row totals__row--discount"><span>Скидка</span><b>−${rub(tt.saved)}</b></div>` : ''}
-      ${tt.discount ? `<div class="totals__row totals__row--discount"><span>Промокод ${state.promo}</span><b>−${rub(tt.discount)}</b></div>` : ''}
+      <div class="totals__row"><span>Товары</span><b>${rub(tt.subtotal)}</b></div>
       <div class="totals__row"><span>${pickup ? 'Самовывоз' : 'Доставка'}</span><b>${tt.delivery ? rub(tt.delivery) : 'Бесплатно'}</b></div>
       <div class="totals__row"><span>Сборка</span><b>${rub(tt.service)}</b></div>
       ${f.tip && !pickup ? `<div class="totals__row"><span>Чаевые</span><b>${rub(f.tip)}</b></div>` : ''}
@@ -692,7 +653,6 @@ function placeOrder(f) {
   };
   state.orders.unshift(order);
   t.okLines.forEach(l => delete state.cart[l.p.id]);
-  state.promo = null;
   save(); renderAll();
   openTracking(order.id);
 }
@@ -809,17 +769,11 @@ document.addEventListener('click', e => {
   }
   if ((x = el('[data-open]'))) return openProduct(x.dataset.open);
   if ((x = el('[data-cat]'))) { closeAll(); return goCatalog(x.dataset.cat); }
-  if ((x = el('[data-chip]'))) { state.filters = new Set([x.dataset.chip]); return goCatalog('all'); }
   if ((x = el('[data-filter]'))) {
     const f = x.dataset.filter;
     state.filters.has(f) ? state.filters.delete(f) : state.filters.add(f);
     x.classList.toggle('active', state.filters.has(f));
     return renderCatalog();
-  }
-  if ((x = el('[data-banner]'))) {
-    const b = BANNERS[x.dataset.banner];
-    if (b.cat) return goCatalog(b.cat);
-    if (b.promo) { state.promo = b.promo; save(); renderCart(); return toast(`Промокод ${b.promo} применён`); }
   }
   if ((x = el('[data-track]'))) return openTracking(x.dataset.track);
   if ((x = el('[data-repeat]'))) return repeatOrder(x.dataset.repeat);
@@ -836,7 +790,6 @@ document.addEventListener('click', e => {
       toast('Корзина очищена', { label: 'Вернуть', fn: () => { state.cart = backup; save(); renderAll(); } });
     }
     if (a === 'remove-bad') { cartLines().filter(l => !l.ok).forEach(l => l.avail ? state.cart[l.p.id] = l.avail : delete state.cart[l.p.id]); save(); renderAll(); }
-    if (a === 'remove-promo') { state.promo = null; save(); renderCart(); }
     if (a === 'checkout') { $('#drawer').classList.remove('show'); $('#drawer').dataset.view = ''; openCheckout(); }
     if (a === 'reset') { state.filters.clear(); state.query = ''; $('#searchInput').value = ''; goCatalog('all'); }
     if (a === 'clear-favs') {
@@ -853,9 +806,6 @@ document.addEventListener('click', e => {
   }
 });
 
-document.addEventListener('submit', e => {
-  if (e.target.matches('[data-promo-form]')) { e.preventDefault(); applyPromo(e.target.code.value); }
-});
 document.addEventListener('change', e => {
   if (e.target.id === 'sortSelect') { state.sort = e.target.value; renderCatalog(); }
   if (e.target.id === 'favSort') { state.favSort = e.target.value; renderFavorites(); }
