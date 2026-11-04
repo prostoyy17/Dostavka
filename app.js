@@ -1,5 +1,11 @@
 (() => {
 'use strict';
+const BUILD = '1793790465';
+if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
+  const u = new URL(location.href);
+  if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
+  return;
+}
 
 /* ================= Helpers / state ================= */
 const LS = {
