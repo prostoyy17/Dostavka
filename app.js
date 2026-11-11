@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794431505';
+const BUILD = '1794431605';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -153,9 +153,9 @@ function renderPage() {
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (navOf[state.route] || state.route)));
   document.body.classList.toggle('sub', state.route !== 'catalog');
   renderCats();
-  if (state.route === 'favorites') { renderFavorites(); return addBack(); }
+  if (state.route === 'favorites') { renderFavorites(); return addGap(); }
   if (state.route === 'orders') { renderOrders(); return addBack(); }
-  if (state.route === 'cart') { renderCartPage(); return addBack(); }
+  if (state.route === 'cart') { renderCartPage(); return addGap(); }
   if (state.route === 'account') return renderAccount();
   if (state.route === 'address') return renderAddress();
   if (state.route === 'about') return renderAbout();
@@ -303,6 +303,7 @@ const tile = (name, color, cls = '') => `<span class="pico ${cls}">${svgI(name, 
 const icoBack = svgI('back', 26);
 const icoChev = svgI('chev', 18);
 const backBar = () => `<div class="subhead"><button class="subhead__back" data-action="back" aria-label="Назад">${icoBack}</button></div>`;
+function addGap() { $('#page').insertAdjacentHTML('afterbegin', '<div class="tabgap"></div>'); }
 function addBack() { $('#page').insertAdjacentHTML('afterbegin', backBar()); }
 function addressText() {
   const a = state.address || {};

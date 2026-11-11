@@ -844,3 +844,5 @@ body.sub .top { display: none; }
 .fav-btn .phi { width: 24px; height: 24px; }
 .fav-btn.on, :root[data-theme="dark"] .card .fav-btn.on { color: var(--sale); }
 :root[data-theme="dark"] .fav-btn { filter: none; }
+.tabgap { height: 28px; }
+.cart-page { padding-top: 9px; }
