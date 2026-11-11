@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794396436';
+const BUILD = '1794398096';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -326,8 +326,8 @@ function renderPoint() {
     <div class="point-card__row"><span>Товары из</span><b>${pt.store}</b></div>
     <div class="point-card__row"><span>Часы</span><b>${hours(pt)}</b></div>
     <div class="point-card__row"><span>Доставка</span><b>${pt.eta}</b></div>
-    <div class="point-card__row"><span>Бесплатно от</span><b>${rub(pt.freeFrom)}</b></div>
-    <div class="point-card__row"><span>Заказ от</span><b>${rub(pt.minOrder)}</b></div>`;
+    <div class="point-card__row"><span>Бесплатно от</span><b>${rub(pt.freeFrom)}</b></div>${pt.minOrder ? `
+    <div class="point-card__row"><span>Заказ от</span><b>${rub(pt.minOrder)}</b></div>` : ''}`;
 }
 
 function mapSVG(sel) {
@@ -368,7 +368,7 @@ function openPoints() {
               <span class="pt__city">${p.city}</span>
               <span class="pt__addr">${p.store} · ${p.address}</span>
               <span class="pt__eta">${p.eta}<small class="${open ? '' : 'closed'}">${open ? 'Открыто' : 'Закрыто'}</small></span>
-              <span class="pt__info">${hours(p)} · ${n.toLocaleString('ru-RU')} товаров · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно · заказ от ${rub(p.minOrder)}</span>
+              <span class="pt__info">${hours(p)} · ${n.toLocaleString('ru-RU')} товаров · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно${p.minOrder ? ` · заказ от ${rub(p.minOrder)}` : ''}</span>
             </button>`;
           }).join('')}
           <button class="btn btn--primary btn--block" data-confirm-point>Готово</button>

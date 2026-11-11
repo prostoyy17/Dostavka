@@ -3,7 +3,7 @@
 const POINTS = [
   {
     id: 'msf', city: 'Грозный', store: 'Musafir Market', address: 'ул. Сайханова, 101а',
-    hours: [9, 21], eta: '60–90 мин', minOrder: 1000, deliveryFee: 200, freeFrom: 3000,
+    hours: [9, 21], eta: '60–90 мин', minOrder: 0, deliveryFee: 200, freeFrom: 3000,
     phone: '+7 (965) 952-54-34', x: 262, y: 118,
     zones: ['Ахматовский', 'Байсангуровский', 'Висаитовский', 'Шейх-Мансуровский']
   }
