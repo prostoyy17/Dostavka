@@ -25,11 +25,11 @@
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #060A1E; --surface: #0D1331; --surface-2: #141B3F; --surface-3: #1E2752;
-  --text: #EEEDE8; --text-2: #B3B7CB; --text-3: #7B81A3; --line: #1E2650;
-  --accent: #4A7BFF; --accent-2: #3567F0; --accent-soft: #15215C;
+  --bg: #000000; --surface: #161618; --surface-2: #1F1F22; --surface-3: #2A2A2E;
+  --text: #FFFFFF; --text-2: #C7C7CC; --text-3: #8E8E93; --line: #2A2A2E;
+  --accent: #4D7CFF; --accent-2: #3D6BF0; --accent-soft: #1A2A55; --sale: #FF5A4A;
   --danger-soft: #3a1d1b; --warn-soft: #3a2f16;
-  --shadow: 0 1px 2px rgba(0,0,0,.3);
+  --shadow: 0 1px 2px rgba(0,0,0,.4);
   color-scheme: dark;
 }
 
@@ -353,7 +353,7 @@ img { display: block; }
 /* Points modal */
 .pts { display: grid; grid-template-columns: 1.1fr 1fr; }
 .pts__map { background: #dcefe1; position: relative; min-height: 440px; }
-:root[data-theme="dark"] .pts__map { background: #18261d; }
+:root[data-theme="dark"] .pts__map { background: #1F1F22; }
 .pts__map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .map-pin { cursor: pointer; }
 .pts__list { padding: 24px; display: flex; flex-direction: column; gap: 10px; }
@@ -590,7 +590,7 @@ img.photo { position: absolute; left: 6%; top: 6%; width: 88% !important; height
    MayrMarket v3 — app-style redesign (no header bar, borderless cards)
    ===================================================================== */
 :root { --tile: #FFFFFF; --font: 'Onest', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; --page: 1240px; }
-:root[data-theme="dark"] { --tile: #121A3D; }
+:root[data-theme="dark"] { --tile: #161618; }
 body { font-family: var(--font); background: var(--bg); letter-spacing: -0.005em; }
 button, input, select, textarea { font-family: var(--font); }
 
@@ -854,3 +854,7 @@ body.sub .top { display: none; }
 .add-btn--round:active { transform: scale(.92); }
 .stepper--round { box-shadow: none !important; }
 .add-btn--round .phi { width: 22px; height: 22px; }
+
+/* v11: тёмная тема — чёрная (вариант А) */
+:root[data-theme="dark"] .tabbar { box-shadow: none; border-top: 1px solid var(--line); }
+:root[data-theme="dark"] .dd__back { background: rgba(0,0,0,.6); }

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794432490';
+const BUILD = '1794432923';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -61,6 +61,7 @@ const isDesktopCart = () => false;   // корзина всегда открыв
 function applyTheme() {
   const t = state.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.dataset.theme = t;
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = t === 'dark' ? '#000000' : '#EEEDE8';
 }
 applyTheme();
 
