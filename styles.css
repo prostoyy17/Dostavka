@@ -838,3 +838,9 @@ body.sub .top { display: none; }
 .acc__count { min-width: 24px; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); font-size: 13px; font-weight: 700; display: grid; place-items: center; }
 .tabbar { grid-template-columns: repeat(4, 1fr) !important; }
 .acc__credit { text-align: center; font-size: 12px; color: var(--text-3); } .acc__credit a { color: inherit; text-decoration: underline; }
+/* v9: лайк без кружка */
+.fav-btn, .card .fav-btn, :root[data-theme="dark"] .card .fav-btn { background: none !important; box-shadow: none !important; border-radius: 0; color: #9AA0B4; filter: drop-shadow(0 1px 1.5px rgba(255,255,255,.9)); }
+.card .fav-btn { right: 8px; top: 8px; width: 36px; height: 36px; }
+.fav-btn .phi { width: 24px; height: 24px; }
+.fav-btn.on, :root[data-theme="dark"] .card .fav-btn.on { color: var(--sale); }
+:root[data-theme="dark"] .fav-btn { filter: none; }
