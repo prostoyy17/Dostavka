@@ -779,3 +779,13 @@ body.sub .top { display: none; }
 .switch:checked { background: var(--accent); }
 .switch:checked::after { transform: translateX(20px); }
 .tabbar svg, .round-btn svg, .cart-pill svg { stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+/* v5: подложка выпадающих окон, корзина на весь экран */
+.dd__back { display: none; }
+@media (max-width: 760px) {
+  .dd__back { display: block; position: fixed; inset: -120px 0 -120px; z-index: 59; background: rgba(6, 10, 30, .45); animation: ddfade .2s ease; }
+  .dd__menu, .dd--right .dd__menu { box-shadow: 0 -8px 30px rgba(0,0,0,.18); animation: ddup .25s cubic-bezier(.2,.8,.2,1); }
+  .drawer { width: 100%; border-radius: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); box-shadow: none; }
+  .overlay { inset: -120px 0; }
+}
+@keyframes ddfade { from { opacity: 0; } }
+@keyframes ddup { from { transform: translateY(100%); } }

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794426062';
+const BUILD = '1794426410';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -230,7 +230,8 @@ function renderControls() {
   const flt = `<div class="dd"><button class="pill ${nF ? 'on' : ''}" data-dd="flt">${icoFilter}<span class="pill__label">Фильтры</span>${nF ? `<b class="pill__n">${nF}</b>` : caret}</button>${state.dd === 'flt' ? `<div class="dd__menu">${head('Фильтры')}<div class="dd__scroll">${FILTERS.map(([f, l]) => `<button class="dd__opt ${state.filters.has(f) ? 'sel' : ''}" data-filter="${f}"><span>${l}</span><i class="dd__box"></i></button>`).join('')}</div></div>` : ''}</div>`;
   const sortName = (SORTS.find(s => s[0] === state.sort) || SORTS[0])[2];
   const srt = `<div class="dd dd--right"><button class="pill" data-dd="sort">${icoSort}<span class="pill__label">${sortName}</span>${caret}</button>${state.dd === 'sort' ? `<div class="dd__menu">${head('Сортировка')}<div class="dd__scroll">${SORTS.map(([v, l]) => `<button class="dd__opt ${state.sort === v ? 'sel' : ''}" data-sort="${v}"><span>${l}</span></button>`).join('')}</div></div>` : ''}</div>`;
-  box.innerHTML = sub + flt + srt;
+  box.innerHTML = (state.dd ? '<div class="dd__back" data-dd-close></div>' : '') + sub + flt + srt;
+  if (state.dd && matchMedia('(max-width: 760px)').matches) lockScroll('dd'); else unlockScroll('dd');
 }
 
 function renderCatalog() {
@@ -282,9 +283,12 @@ function renderCats() {
     <a class="cat-link ${state.route === 'orders' ? 'active' : ''}" href="#/orders">${ic('package', 'cat-link__icon')}<span class="cat-link__name">Мои заказы</span><span class="cat-link__count">${state.orders.length || ''}</span></a>`;
   $$('[data-fav-count]').forEach(b => { b.hidden = !state.favs.length; b.textContent = state.favs.length; });
 }
+let catStripX = 0;
 function renderCatStrip() {
   const s = $('#catStrip');
+  if (s) s.onscroll = () => { catStripX = s.scrollLeft; };
   if (s) s.innerHTML = catItems().map(c => `<button class="circle ${state.cat === c.id ? 'active' : ''}" data-cat="${c.id}"><span class="circle__img" style="background:${c.color || 'var(--surface)'}">${ic(c.icon, '')}</span><span class="circle__name">${c.name}</span></button>`).join('');
+  if (s) s.scrollLeft = catStripX;
 }
 
 
@@ -861,14 +865,30 @@ function repeatOrder(id) {
 }
 
 /* ================= Overlays ================= */
-function showOverlay() { $('#overlay').classList.add('show'); document.body.classList.add('locked'); }
+/* Блокировка прокрутки фона (надёжно и на iPhone): фон не двигается, позиция сохраняется */
+const scrollLocks = new Set(); let lockedY = 0;
+function lockScroll(why) {
+  if (!scrollLocks.size) {
+    lockedY = window.scrollY;
+    Object.assign(document.body.style, { position: 'fixed', top: -lockedY + 'px', left: '0', right: '0', width: '100%' });
+    document.body.classList.add('locked');
+  }
+  scrollLocks.add(why);
+}
+function unlockScroll(why) {
+  if (!scrollLocks.delete(why) || scrollLocks.size) return;
+  Object.assign(document.body.style, { position: '', top: '', left: '', right: '', width: '' });
+  document.body.classList.remove('locked');
+  window.scrollTo(0, lockedY);
+}
+function showOverlay() { $('#overlay').classList.add('show'); lockScroll('overlay'); }
 function closeAll() {
   $('#modal').classList.remove('show');
   $('#modal').onclick = null;
   $('#drawer').classList.remove('show');
   $('#drawer').dataset.view = '';
   $('#overlay').classList.remove('show');
-  document.body.classList.remove('locked');
+  unlockScroll('overlay');
   clearInterval(trackTimer);
 }
 function openCart() {
