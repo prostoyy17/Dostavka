@@ -1,15 +1,15 @@
 :root {
-  --bg: #f3f4f2;
+  --bg: #EEEDE8;
   --surface: #ffffff;
-  --surface-2: #f1f2ef;
-  --surface-3: #e5e7e2;
-  --text: #1c1f1d;
-  --text-2: #5f6661;
-  --text-3: #959b97;
-  --line: #e3e5e1;
-  --accent: #14a05c;
-  --accent-2: #0e8a4e;
-  --accent-soft: #e2f5ea;
+  --surface-2: #F4F3EF;
+  --surface-3: #E4E2DA;
+  --text: #0E1433;
+  --text-2: #4B5170;
+  --text-3: #8E92A6;
+  --line: #E1DFD7;
+  --accent: #0033B0;
+  --accent-2: #00278A;
+  --accent-soft: #E3E9F8;
   --danger: #e2453a;
   --danger-soft: #fde8e6;
   --warn: #d98a00;
@@ -25,9 +25,9 @@
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #111412; --surface: #1a1e1b; --surface-2: #232825; --surface-3: #2e3430;
-  --text: #eef1ee; --text-2: #a5ada7; --text-3: #737b75; --line: #2c312d;
-  --accent: #2bc275; --accent-2: #22a863; --accent-soft: #173426;
+  --bg: #060A1E; --surface: #0D1331; --surface-2: #141B3F; --surface-3: #1E2752;
+  --text: #EEEDE8; --text-2: #B3B7CB; --text-3: #7B81A3; --line: #1E2650;
+  --accent: #4A7BFF; --accent-2: #3567F0; --accent-soft: #15215C;
   --danger-soft: #3a1d1b; --warn-soft: #3a2f16;
   --shadow: 0 1px 2px rgba(0,0,0,.3);
   color-scheme: dark;
@@ -182,7 +182,7 @@ img { display: block; }
 .tag { font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 6px; line-height: 1.2; }
 .tag--sale { background: var(--sale); color: #fff; }
 .tag--hit { background: #ffd43b; color: #3a2f00; }
-.tag--halal { background: #0e8a4e; color: #fff; }
+.tag--halal { background: #0033B0; color: #fff; }
 .tag--local { background: #fff; color: #9a5b00; }
 .tag--out { background: rgba(0,0,0,.65); color: #fff; }
 .fav-btn {
@@ -534,3 +534,54 @@ img.photo { position: absolute; left: 6%; top: 6%; width: 88% !important; height
 .more { display: flex; justify-content: center; margin: 20px 0 8px; }
 .more .btn { min-width: 260px; }
 .card__name { word-break: break-word; }
+
+/* ================= MayrMarket brand ================= */
+.logo__text b { color: var(--accent); font-weight: 800; }
+.logo__mark { background: var(--accent); }
+
+/* ================= Compact controls: Подраздел · Фильтры · Сортировка ================= */
+.toolbar { margin-bottom: 12px; }
+.controls { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+.dd { position: relative; min-width: 0; }
+.dd--right { margin-left: auto; }
+.pill {
+  height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface);
+  display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; max-width: 240px; min-width: 0; color: var(--text);
+}
+.pill:hover { border-color: var(--text-3); }
+.pill.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pill svg { flex-shrink: 0; }
+.pill__label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pill__n { background: #fff; color: var(--accent); border-radius: 9px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; display: grid; place-items: center; flex-shrink: 0; }
+.pill__x { font-style: normal; font-size: 17px; line-height: 1; margin-left: 2px; opacity: .85; flex-shrink: 0; }
+.dd__menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 25; width: 300px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-lg); padding: 6px;
+}
+.dd--right .dd__menu { left: auto; right: 0; width: 230px; }
+.dd__head { display: none; }
+.dd__scroll { max-height: 360px; overflow-y: auto; scrollbar-width: thin; }
+.dd__opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 9px; font-size: 14px; text-align: left; }
+.dd__opt:hover { background: var(--surface-2); }
+.dd__opt.sel { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.dd__opt em { font-style: normal; color: var(--text-3); font-size: 12px; font-weight: 500; }
+.dd__opt span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd__box { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--line); flex-shrink: 0; display: grid; place-items: center; }
+.dd__opt.sel .dd__box { background: var(--accent); border-color: var(--accent); }
+.dd__opt.sel .dd__box::after { content: ''; width: 9px; height: 5px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+@media (max-width: 760px) {
+  .controls { gap: 6px; }
+  .dd { flex: 1 1 0; }
+  .dd--right { margin-left: 0; }
+  .pill { width: 100%; max-width: none; justify-content: center; padding: 0 8px; font-size: 12.5px; }
+  .dd__menu, .dd--right .dd__menu {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; z-index: 60;
+    border-radius: 20px 20px 0 0; padding: 8px 12px calc(14px + env(safe-area-inset-bottom));
+    box-shadow: 0 0 0 100vmax rgba(6, 10, 30, .45);
+  }
+  .dd__head { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 18px; padding: 8px 6px 10px; }
+  .dd__head button { width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2); }
+  .dd__scroll { max-height: 62vh; }
+  .dd__opt { padding: 12px 10px; font-size: 15px; }
+  .pill__ico { display: none; }
+}

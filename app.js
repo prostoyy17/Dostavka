@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794415994';
+const BUILD = '1794423174';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -27,6 +27,7 @@ const state = {
   filters: new Set(),
   sort: 'pop',
   limit: 60,
+  dd: null,
   favSort: 'added'
 };
 
@@ -180,17 +181,44 @@ function renderCatalogPage() {
   const title = state.query ? `Поиск «${esc(state.query)}»` : state.cat === 'all' ? 'Все товары' : catById[state.cat].name;
   page.innerHTML = `
     <div class="cat-strip" id="catStrip"></div>
-    <div class="toolbar">
-      <h1 class="toolbar__title">${title}</h1>
-      <div class="toolbar__controls">${sortSelect('sortSelect', state.sort)}</div>
-    </div>
-    <div class="filters">
-      ${[['photo', 'С фото'], ['kg', 'Весовые']].map(([f, l]) => `<button class="chip ${state.filters.has(f) ? 'active' : ''}" data-filter="${f}">${l}</button>`).join('')}
-      ${state.cat !== 'all' && catById[state.cat].subs.length ? `<span class="filters__sep"></span>` + [null, ...catById[state.cat].subs].map(s => `<button class="chip ${state.sub === s ? 'active' : ''}" data-sub="${s == null ? '' : esc(s)}">${s == null ? 'Все' : esc(s)}</button>`).join('') : ''}
-    </div>
+    <div class="toolbar"><h1 class="toolbar__title">${title}</h1></div>
+    <div class="controls" id="controls"></div>
     <div id="catalog"></div>`;
   renderCatStrip();
+  renderControls();
   renderCatalog();
+}
+
+/* ---- compact controls: Подраздел · Фильтры · Сортировка ---- */
+const SORTS = [['pop', 'Популярные', 'Популярные'], ['asc', 'Сначала дешевле', 'Дешевле'], ['desc', 'Сначала дороже', 'Дороже'], ['name', 'По названию', 'А–Я']];
+const FILTERS = [['photo', 'Только с фото'], ['kg', 'Весовые товары']];
+const caret = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m6 9 6 6 6-6"/></svg>';
+const icoFilter = '<svg class="pill__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 5h18M6 12h12M10 19h4"/></svg>';
+const icoSort = '<svg class="pill__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>';
+function renderControls() {
+  const box = $('#controls');
+  if (!box) return;
+  const c = state.cat !== 'all' ? catById[state.cat] : null;
+  const nF = state.filters.size;
+  const head = t => `<div class="dd__head">${t}<button data-dd-close aria-label="Закрыть">✕</button></div>`;
+  let sub = '';
+  if (c && c.subs.length) {
+    let menu = '';
+    if (state.dd === 'sub') {
+      const cnt = {};
+      PRODUCTS.forEach(p => { if (p.cat === c.id) cnt[p.sub] = (cnt[p.sub] || 0) + 1; });
+      const all = PRODUCTS.filter(p => p.cat === c.id).length;
+      menu = `<div class="dd__menu">${head('Подраздел')}<div class="dd__scroll">
+        <button class="dd__opt ${!state.sub ? 'sel' : ''}" data-sub=""><span>Все</span><em>${all}</em></button>
+        ${c.subs.map(s => `<button class="dd__opt ${state.sub === s ? 'sel' : ''}" data-sub="${esc(s)}"><span>${esc(s)}</span><em>${cnt[s] || 0}</em></button>`).join('')}
+      </div></div>`;
+    }
+    sub = `<div class="dd"><button class="pill ${state.sub ? 'on' : ''}" data-dd="sub"><span class="pill__label">${state.sub ? esc(state.sub) : 'Подраздел'}</span>${state.sub ? '<i class="pill__x" data-sub="" title="Сбросить">×</i>' : caret}</button>${menu}</div>`;
+  }
+  const flt = `<div class="dd"><button class="pill ${nF ? 'on' : ''}" data-dd="flt">${icoFilter}<span class="pill__label">Фильтры</span>${nF ? `<b class="pill__n">${nF}</b>` : caret}</button>${state.dd === 'flt' ? `<div class="dd__menu">${head('Фильтры')}<div class="dd__scroll">${FILTERS.map(([f, l]) => `<button class="dd__opt ${state.filters.has(f) ? 'sel' : ''}" data-filter="${f}"><span>${l}</span><i class="dd__box"></i></button>`).join('')}</div></div>` : ''}</div>`;
+  const sortName = (SORTS.find(s => s[0] === state.sort) || SORTS[0])[2];
+  const srt = `<div class="dd dd--right"><button class="pill" data-dd="sort">${icoSort}<span class="pill__label">${sortName}</span>${caret}</button>${state.dd === 'sort' ? `<div class="dd__menu">${head('Сортировка')}<div class="dd__scroll">${SORTS.map(([v, l]) => `<button class="dd__opt ${state.sort === v ? 'sel' : ''}" data-sort="${v}"><span>${l}</span></button>`).join('')}</div></div>` : ''}</div>`;
+  box.innerHTML = sub + flt + srt;
 }
 
 function renderCatalog() {
@@ -335,8 +363,8 @@ function mapSVG(sel) {
   const pins = POINTS.map(p => {
     const on = p.id === sel;
     return `<g class="map-pin" data-pick="${p.id}" transform="translate(${p.x},${p.y})">
-      ${on ? '<circle r="20" fill="#14a05c" opacity=".18"/>' : ''}
-      <circle r="${on ? 10 : 8}" fill="${on ? '#14a05c' : '#fff'}" stroke="${on ? '#fff' : '#14a05c'}" stroke-width="3"/>
+      ${on ? '<circle r="20" fill="#0033B0" opacity=".18"/>' : ''}
+      <circle r="${on ? 10 : 8}" fill="${on ? '#0033B0' : '#fff'}" stroke="${on ? '#fff' : '#0033B0'}" stroke-width="3"/>
       <text y="-18" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">${p.city}</text>
     </g>`;
   }).join('');
@@ -747,7 +775,7 @@ function toast(msg, action) {
 
 /* ================= Events ================= */
 function goCatalog(cat) {
-  state.cat = cat; state.sub = null; state.limit = 60;
+  state.cat = cat; state.sub = null; state.limit = 60; state.dd = null;
   state.query = ''; $('#searchInput').value = '';
   if (state.route !== 'catalog') { location.hash = '#/'; return; }
   renderPage();
@@ -757,6 +785,7 @@ function goCatalog(cat) {
 document.addEventListener('click', e => {
   const el = s => e.target.closest(s);
   let x;
+  if (state.dd && !el('.dd')) { state.dd = null; renderControls(); }
   if ((x = el('[data-add]'))) return setQty(x.dataset.add, 1);
   if ((x = el('[data-inc]'))) return setQty(x.dataset.inc, (state.cart[x.dataset.inc] || 0) + 1);
   if ((x = el('[data-dec]'))) {
@@ -778,15 +807,20 @@ document.addEventListener('click', e => {
   if ((x = el('[data-filter]'))) {
     const f = x.dataset.filter;
     state.filters.has(f) ? state.filters.delete(f) : state.filters.add(f);
-    x.classList.toggle('active', state.filters.has(f));
     state.limit = 60;
-    return renderCatalog();
+    renderControls(); return renderCatalog();
   }
   if ((x = el('[data-sub]'))) {
-    state.sub = x.dataset.sub || null; state.limit = 60;
-    $$('[data-sub]').forEach(b => b.classList.toggle('active', (b.dataset.sub || null) === state.sub));
-    return renderCatalog();
+    state.sub = x.dataset.sub || null; state.limit = 60; state.dd = null;
+    renderControls(); return renderCatalog();
   }
+  if ((x = el('[data-sort]'))) {
+    state.sort = x.dataset.sort; state.limit = 60; state.dd = null;
+    renderControls(); return renderCatalog();
+  }
+  if (el('[data-dd-close]')) { state.dd = null; return renderControls(); }
+  if ((x = el('[data-dd]'))) { state.dd = state.dd === x.dataset.dd ? null : x.dataset.dd; return renderControls(); }
+
   if ((x = el('[data-track]'))) return openTracking(x.dataset.track);
   if ((x = el('[data-repeat]'))) return repeatOrder(x.dataset.repeat);
   if (el('[data-close]')) return closeAll();
@@ -824,7 +858,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'favSort') { state.favSort = e.target.value; renderFavorites(); }
 });
 $('#overlay').addEventListener('click', closeAll);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAll(); if (state.dd) { state.dd = null; renderControls(); } } });
 
 let searchT;
 $('#searchInput').addEventListener('input', e => {
