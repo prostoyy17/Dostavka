@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794426410';
+const BUILD = '1794427188';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -36,6 +36,9 @@ const catById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const rub = n => Math.round(n).toLocaleString('ru-RU') + ' ₽';
+/* Иконки: Phosphor Icons (MIT), единый сплошной стиль на всём сайте */
+const PHI = {"house": "<path d=\"M224,120v96a8,8,0,0,1-8,8H160a8,8,0,0,1-8-8V164a4,4,0,0,0-4-4H108a4,4,0,0,0-4,4v52a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V120a16,16,0,0,1,4.69-11.31l80-80a16,16,0,0,1,22.62,0l80,80A16,16,0,0,1,224,120Z\"/>", "heart": "<path d=\"M240,102c0,70-103.79,126.66-108.21,129a8,8,0,0,1-7.58,0C119.79,228.66,16,172,16,102A62.07,62.07,0,0,1,78,40c20.65,0,38.73,8.88,50,23.89C139.27,48.88,157.35,40,178,40A62.07,62.07,0,0,1,240,102Z\"/>", "heart-o": "<path d=\"M178,36c-20.09,0-37.92,7.93-50,21.56C115.92,43.93,98.09,36,78,36a66.08,66.08,0,0,0-66,66c0,72.34,105.81,130.14,110.31,132.57a12,12,0,0,0,11.38,0C138.19,232.14,244,174.34,244,102A66.08,66.08,0,0,0,178,36Zm-5.49,142.36A328.69,328.69,0,0,1,128,210.16a328.69,328.69,0,0,1-44.51-31.8C61.82,159.77,36,131.42,36,102A42,42,0,0,1,78,60c17.8,0,32.7,9.4,38.89,24.54a12,12,0,0,0,22.22,0C145.3,69.4,160.2,60,178,60a42,42,0,0,1,42,42C220,131.42,194.18,159.77,172.51,178.36Z\"/>", "receipt": "<path d=\"M216,40H40A16,16,0,0,0,24,56V208a8,8,0,0,0,11.58,7.15L64,200.94l28.42,14.21a8,8,0,0,0,7.16,0L128,200.94l28.42,14.21a8,8,0,0,0,7.16,0L192,200.94l28.42,14.21A8,8,0,0,0,232,208V56A16,16,0,0,0,216,40ZM176,144H80a8,8,0,0,1,0-16h96a8,8,0,0,1,0,16Zm0-32H80a8,8,0,0,1,0-16h96a8,8,0,0,1,0,16Z\"/>", "cart": "<path d=\"M239.71,74.14l-25.64,92.28A24.06,24.06,0,0,1,191,184H92.16A24.06,24.06,0,0,1,69,166.42L33.92,40H16a8,8,0,0,1,0-16H40a8,8,0,0,1,7.71,5.86L57.19,64H232a8,8,0,0,1,7.71,10.14ZM88,200a16,16,0,1,0,16,16A16,16,0,0,0,88,200Zm104,0a16,16,0,1,0,16,16A16,16,0,0,0,192,200Z\"/>", "user": "<path d=\"M230.93,220a8,8,0,0,1-6.93,4H32a8,8,0,0,1-6.92-12c15.23-26.33,38.7-45.21,66.09-54.16a72,72,0,1,1,73.66,0c27.39,8.95,50.86,27.83,66.09,54.16A8,8,0,0,1,230.93,220Z\"/>", "pin": "<path d=\"M128,16a88.1,88.1,0,0,0-88,88c0,75.3,80,132.17,83.41,134.55a8,8,0,0,0,9.18,0C136,236.17,216,179.3,216,104A88.1,88.1,0,0,0,128,16Zm0,56a32,32,0,1,1-32,32A32,32,0,0,1,128,72Z\"/>", "gear": "<path d=\"M237.94,107.21a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A111.92,111.92,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.63a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21ZM128,168a40,40,0,1,1,40-40A40,40,0,0,1,128,168Z\"/>", "info": "<path d=\"M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm-4,48a12,12,0,1,1-12,12A12,12,0,0,1,124,72Zm12,112a16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40a8,8,0,0,1,0,16Z\"/>", "moon": "<path d=\"M235.54,150.21a104.84,104.84,0,0,1-37,52.91A104,104,0,0,1,32,120,103.09,103.09,0,0,1,52.88,57.48a104.84,104.84,0,0,1,52.91-37,8,8,0,0,1,10,10,88.08,88.08,0,0,0,109.8,109.8,8,8,0,0,1,10,10Z\"/>", "search": "<path d=\"M232.49,215.51,185,168a92.12,92.12,0,1,0-17,17l47.53,47.54a12,12,0,0,0,17-17ZM44,112a68,68,0,1,1,68,68A68.07,68.07,0,0,1,44,112Z\"/>", "bag": "<path d=\"M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm-88,96A48.05,48.05,0,0,1,80,88a8,8,0,0,1,16,0,32,32,0,0,0,64,0,8,8,0,0,1,16,0A48.05,48.05,0,0,1,128,136Z\"/>", "store": "<path d=\"M231.69,93.81,217.35,43.6A16.07,16.07,0,0,0,202,32H54A16.07,16.07,0,0,0,38.65,43.6L24.31,93.81A7.94,7.94,0,0,0,24,96v16a40,40,0,0,0,16,32v72a8,8,0,0,0,8,8H208a8,8,0,0,0,8-8V144a40,40,0,0,0,16-32V96A7.94,7.94,0,0,0,231.69,93.81ZM88,112a24,24,0,0,1-35.12,21.26,7.88,7.88,0,0,0-1.82-1.06A24,24,0,0,1,40,112v-8H88Zm64,0a24,24,0,0,1-48,0v-8h48Zm64,0a24,24,0,0,1-11.07,20.2,8.08,8.08,0,0,0-1.8,1.05A24,24,0,0,1,168,112v-8h48Z\"/>", "moped": "<path d=\"M216,128a39.3,39.3,0,0,0-6.27.5L175.49,37.19A8,8,0,0,0,168,32H136a8,8,0,0,0,0,16h26.46l32.3,86.13a40.13,40.13,0,0,0-18,25.87H136.54l-25-66.81A8,8,0,0,0,104,88H24a8,8,0,0,0,0,16h8v13.39A56.12,56.12,0,0,0,0,168a8,8,0,0,0,8,8h8.8a40,40,0,0,0,78.4,0h81.6A40,40,0,1,0,216,128ZM56,192a24,24,0,0,1-22.62-16H78.62A24,24,0,0,1,56,192Zm160,0a24,24,0,0,1-15.43-42.36l7.94,21.17a8,8,0,0,0,15-5.62L215.55,144H216a24,24,0,0,1,0,48Z\"/>", "check": "<path d=\"M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm45.66,85.66-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32Z\"/>", "clip": "<path d=\"M200,32H163.74a47.92,47.92,0,0,0-71.48,0H56A16,16,0,0,0,40,48V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V48A16,16,0,0,0,200,32Zm-72,0a32,32,0,0,1,32,32H96A32,32,0,0,1,128,32Zm32,128H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Zm0-32H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Z\"/>", "package": "<path d=\"M223.68,66.15,135.68,18a15.88,15.88,0,0,0-15.36,0l-88,48.17a16,16,0,0,0-8.32,14v95.64a16,16,0,0,0,8.32,14l88,48.17a15.88,15.88,0,0,0,15.36,0l88-48.17a16,16,0,0,0,8.32-14V80.18A16,16,0,0,0,223.68,66.15ZM128,32l80.35,44L178.57,92.29l-80.35-44Zm0,88L47.65,76,81.56,57.43l80.35,44Zm88,55.85h0l-80,43.79V133.83l32-17.51V152a8,8,0,0,0,16,0V107.56l32-17.51v85.76Z\"/>", "filter": "<path d=\"M40,92H70.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24H137.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24Zm64-24A12,12,0,1,1,92,80,12,12,0,0,1,104,68Zm112,96H201.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24h94.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24Zm-48,24a12,12,0,1,1,12-12A12,12,0,0,1,168,188Z\"/>", "sort": "<path d=\"M120.49,167.51a12,12,0,0,1,0,17l-32,32a12,12,0,0,1-17,0l-32-32a12,12,0,1,1,17-17L68,179V48a12,12,0,0,1,24,0V179l11.51-11.52A12,12,0,0,1,120.49,167.51Zm96-96-32-32a12,12,0,0,0-17,0l-32,32a12,12,0,0,0,17,17L164,77V208a12,12,0,0,0,24,0V77l11.51,11.52a12,12,0,0,0,17-17Z\"/>", "x": "<path d=\"M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z\"/>", "back": "<path d=\"M228,128a12,12,0,0,1-12,12H69l51.52,51.51a12,12,0,0,1-17,17l-72-72a12,12,0,0,1,0-17l72-72a12,12,0,0,1,17,17L69,116H216A12,12,0,0,1,228,128Z\"/>", "chev": "<path d=\"M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z\"/>", "down": "<path d=\"M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z\"/>", "plus": "<path d=\"M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z\"/>", "minus": "<path d=\"M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z\"/>", "card": "<path d=\"M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM136,176H120a8,8,0,0,1,0-16h16a8,8,0,0,1,0,16Zm64,0H168a8,8,0,0,1,0-16h32a8,8,0,0,1,0,16ZM32,88V64H224V88Z\"/>", "qr": "<path d=\"M120,56v48a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V56A16,16,0,0,1,56,40h48A16,16,0,0,1,120,56Zm-16,80H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm96-96H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40ZM144,184a8,8,0,0,0,8-8V144a8,8,0,0,0-16,0v32A8,8,0,0,0,144,184Zm64-32H184v-8a8,8,0,0,0-16,0v56H144a8,8,0,0,0,0,16h32a8,8,0,0,0,8-8V168h24a8,8,0,0,0,0-16Zm0,32a8,8,0,0,0-8,8v16a8,8,0,0,0,16,0V192A8,8,0,0,0,208,184Z\"/>", "terminal": "<path d=\"M176,16H80A24,24,0,0,0,56,40V216a24,24,0,0,0,24,24h96a24,24,0,0,0,24-24V40A24,24,0,0,0,176,16ZM80,32h96a8,8,0,0,1,8,8v8H72V40A8,8,0,0,1,80,32Zm96,192H80a8,8,0,0,1-8-8v-8H184v8A8,8,0,0,1,176,224Z\"/>", "cash": "<path d=\"M168,128a40,40,0,1,1-40-40A40,40,0,0,1,168,128Zm80-64V192a8,8,0,0,1-8,8H16a8,8,0,0,1-8-8V64a8,8,0,0,1,8-8H240A8,8,0,0,1,248,64Zm-16,46.35A56.78,56.78,0,0,1,193.65,72H62.35A56.78,56.78,0,0,1,24,110.35v35.3A56.78,56.78,0,0,1,62.35,184h131.3A56.78,56.78,0,0,1,232,145.65Z\"/>"};
+const svgI = (n, s = 22, cls = '') => `<svg class="phi ${cls}" width="${s}" height="${s}" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">${PHI[n]}</svg>`;
 const ic = (name, cls = 'ic') => `<img class="${cls}" src="assets/icons/${name}.webp" alt="" loading="lazy" decoding="async">`;
 const isFav = id => state.favs.includes(id);
 const save = () => {
@@ -52,7 +55,7 @@ const pic = (p, cls = 'ic') => p.img ? `<img class="${cls} photo" src="${p.img}"
 const isOpen = pt => { const h = new Date().getHours(); return h >= pt.hours[0] && h < pt.hours[1]; };
 const hours = pt => `${String(pt.hours[0]).padStart(2, '0')}:00–${pt.hours[1]}:00`;
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c; };
-const heart = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20s-7.5-4.6-9.3-9.2C1.4 7.4 3.6 4 7 4c2 0 3.4 1.1 5 3 1.6-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8C19.5 15.4 12 20 12 20z"/></svg>';
+const heart = svgI('heart-o', 20, 'h-off') + svgI('heart', 20, 'h-on');
 const isDesktopCart = () => false;   // корзина всегда открывается шторкой
 
 function applyTheme() {
@@ -99,13 +102,13 @@ function actionHTML(p, size = '') {
   const s = stockOf(p);
   if (size.includes('round')) {
     if (s === 0) return '';
-    if (!q) return `<button class="add-btn add-btn--round" data-add="${p.id}" aria-label="В корзину"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></button>`;
-    return `<div class="stepper stepper--round"><button data-dec="${p.id}" aria-label="Меньше">−</button><span>${q}</span><button data-inc="${p.id}" aria-label="Больше" ${q >= s ? 'disabled' : ''}>+</button></div>`;
+    if (!q) return `<button class="add-btn add-btn--round" data-add="${p.id}" aria-label="В корзину">${svgI('plus', 20)}</button>`;
+    return `<div class="stepper stepper--round"><button data-dec="${p.id}" aria-label="Меньше">${svgI('minus', 16)}</button><span>${q}</span><button data-inc="${p.id}" aria-label="Больше" ${q >= s ? 'disabled' : ''}>${svgI('plus', 16)}</button></div>`;
   }
   if (s === 0) return `<button class="add-btn" disabled>Нет в наличии</button>`;
   if (!q) return `<button class="add-btn ${size.includes('primary') ? 'add-btn--primary' : ''}" data-add="${p.id}">+ В корзину</button>`;
   return `<div class="stepper ${size}">
-    <button data-dec="${p.id}" aria-label="Меньше">−</button>
+    <button data-dec="${p.id}" aria-label="Меньше">${svgI('minus', 16)}</button>
     <span>${q}</span>
     <button data-inc="${p.id}" aria-label="Больше" ${q >= s ? 'disabled' : ''}>+</button>
   </div>`;
@@ -141,7 +144,7 @@ function syncFav(id) {
 /* ================= Router ================= */
 function parseRoute() {
   const h = location.hash.replace(/^#\/?/, '');
-  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings'].find(r => h.startsWith(r)) || 'catalog';
+  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart'].find(r => h.startsWith(r)) || 'catalog';
 }
 window.addEventListener('hashchange', () => { parseRoute(); closeAll(); renderPage(); window.scrollTo(0, 0); });
 
@@ -152,6 +155,7 @@ function renderPage() {
   renderCats();
   if (state.route === 'favorites') { renderFavorites(); return addBack(); }
   if (state.route === 'orders') { renderOrders(); return addBack(); }
+  if (state.route === 'cart') { renderCartPage(); return addBack(); }
   if (state.route === 'account') return renderAccount();
   if (state.route === 'address') return renderAddress();
   if (state.route === 'about') return renderAbout();
@@ -204,15 +208,15 @@ function renderCatalogPage() {
 /* ---- compact controls: Подраздел · Фильтры · Сортировка ---- */
 const SORTS = [['pop', 'Популярные', 'Популярные'], ['asc', 'Сначала дешевле', 'Дешевле'], ['desc', 'Сначала дороже', 'Дороже'], ['name', 'По названию', 'А–Я']];
 const FILTERS = [['photo', 'Только с фото'], ['kg', 'Весовые товары']];
-const caret = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m6 9 6 6 6-6"/></svg>';
-const icoFilter = '<svg class="pill__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 5h18M6 12h12M10 19h4"/></svg>';
-const icoSort = '<svg class="pill__ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>';
+const caret = svgI('down', 13);
+const icoFilter = svgI('filter', 16, 'pill__ico');
+const icoSort = svgI('sort', 16, 'pill__ico');
 function renderControls() {
   const box = $('#controls');
   if (!box) return;
   const c = state.cat !== 'all' ? catById[state.cat] : null;
   const nF = state.filters.size;
-  const head = t => `<div class="dd__head">${t}<button data-dd-close aria-label="Закрыть">✕</button></div>`;
+  const head = t => `<div class="dd__head">${t}<button data-dd-close aria-label="Закрыть">${svgI('x', 16)}</button></div>`;
   let sub = '';
   if (c && c.subs.length) {
     let menu = '';
@@ -260,7 +264,7 @@ function renderCatalog() {
   CATEGORIES.forEach(c => {
     const items = list.filter(p => p.cat === c.id && p.img && stockOf(p) > 0).sort((a, b) => b.popularity - a.popularity);
     if (!items.length) return;
-    html += `<section class="section"><div class="section__head"><h2 class="section__title">${c.name}</h2><button class="section__more" data-cat="${c.id}">Все<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 6 6 6-6 6"/></svg></button></div><div class="hrow">${items.slice(0, 12).map(cardHTML).join('')}</div></section>`;
+    html += `<section class="section"><div class="section__head"><h2 class="section__title">${c.name}</h2><button class="section__more" data-cat="${c.id}">Все${svgI('chev', 15)}</button></div><div class="hrow">${items.slice(0, 12).map(cardHTML).join('')}</div></section>`;
   });
   root.innerHTML = html;
 }
@@ -279,8 +283,8 @@ function renderCats() {
       <span class="cat-link__count">${c.id === 'all' ? PRODUCTS.length : counts[c.id]}</span>
     </button>`).join('') + `
     <div class="cats__sep"></div>
-    <a class="cat-link ${state.route === 'favorites' ? 'active' : ''}" href="#/favorites" data-cat-fav>${ic('heart', 'cat-link__icon')}<span class="cat-link__name">Избранное</span><span class="cat-link__count" data-fav-side>${state.favs.length || ''}</span></a>
-    <a class="cat-link ${state.route === 'orders' ? 'active' : ''}" href="#/orders">${ic('package', 'cat-link__icon')}<span class="cat-link__name">Мои заказы</span><span class="cat-link__count">${state.orders.length || ''}</span></a>`;
+    <a class="cat-link ${state.route === 'favorites' ? 'active' : ''}" href="#/favorites" data-cat-fav>${svgI('heart', 20, 'cat-link__icon')}<span class="cat-link__name">Избранное</span><span class="cat-link__count" data-fav-side>${state.favs.length || ''}</span></a>
+    <a class="cat-link ${state.route === 'orders' ? 'active' : ''}" href="#/orders">${svgI('package', 20, 'cat-link__icon')}<span class="cat-link__name">Мои заказы</span><span class="cat-link__count">${state.orders.length || ''}</span></a>`;
   $$('[data-fav-count]').forEach(b => { b.hidden = !state.favs.length; b.textContent = state.favs.length; });
 }
 let catStripX = 0;
@@ -293,21 +297,11 @@ function renderCatStrip() {
 
 
 /* ================= Icon tiles (единый стиль иконок) ================= */
-const TILE = {
-  pin: '<path d="M12 21.5s-7.2-6.1-7.2-11.7a7.2 7.2 0 0 1 14.4 0c0 5.6-7.2 11.7-7.2 11.7z" fill="#fff" stroke="none"/><circle cx="12" cy="9.8" r="2.7" fill="currentColor" stroke="none"/>',
-  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
-  info: '<circle cx="12" cy="12" r="9.5" fill="#fff" stroke="none"/><path d="M12 11v5.5" stroke="currentColor" stroke-width="2.6"/><circle cx="12" cy="7.6" r="1.5" fill="currentColor" stroke="none"/>',
-  moon: '<path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z" fill="#fff" stroke="none"/>',
-  heart: '<path d="M12 20.5s-8.2-5-9.9-10C.9 6.7 3.4 3.3 7.1 3.3c2.1 0 3.6 1.1 4.9 2.9 1.3-1.8 2.8-2.9 4.9-2.9 3.7 0 6.2 3.4 5 7.2-1.7 5-9.9 10-9.9 10z" fill="#fff" stroke="none"/>',
-  bag: '<path d="M5 8h14l-1.1 12.1a1.6 1.6 0 0 1-1.6 1.4H7.7a1.6 1.6 0 0 1-1.6-1.4z" fill="#fff" stroke="none"/><path d="M8.8 10.5V7a3.2 3.2 0 0 1 6.4 0v3.5" stroke="currentColor" stroke-width="2.2"/>',
-  receipt: '<path d="M5.5 2.8h13v18.6l-3.25-2.1-3.25 2.1-3.25-2.1-3.25 2.1z" fill="#fff" stroke="none"/><path d="M9 8.5h6M9 12.5h6" stroke="currentColor" stroke-width="2.2"/>',
-  search: '<circle cx="10.8" cy="10.8" r="6.5"/><path d="m20 20-4.4-4.4"/>'
-};
-const tile = (name, color, cls = '') => `<span class="tile tile--${color} ${cls}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${TILE[name]}</svg></span>`;
+const tile = (name, color, cls = '') => `<span class="pico ${cls}">${svgI(name, 24)}</span>`;
 
 /* ================= Account & sub screens ================= */
-const icoBack = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>';
-const icoChev = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>';
+const icoBack = svgI('back', 26);
+const icoChev = svgI('chev', 18);
 const backBar = () => `<div class="subhead"><button class="subhead__back" data-action="back" aria-label="Назад">${icoBack}</button></div>`;
 function addBack() { $('#page').insertAdjacentHTML('afterbegin', backBar()); }
 function addressText() {
@@ -417,8 +411,8 @@ function renderFavorites() {
 }
 
 /* ================= Orders page ================= */
-const STEPS_DELIVERY = [['memo', 'Принят'], ['basket', 'Собираем'], ['scooter', 'В пути'], ['check', 'Доставлен']];
-const STEPS_PICKUP = [['memo', 'Принят'], ['basket', 'Собираем'], ['store', 'Готов'], ['check', 'Выдан']];
+const STEPS_DELIVERY = [['clip', 'Принят'], ['bag', 'Собираем'], ['moped', 'В пути'], ['check', 'Доставлен']];
+const STEPS_PICKUP = [['clip', 'Принят'], ['bag', 'Собираем'], ['store', 'Готов'], ['check', 'Выдан']];
 const payLabel = p => ({ card: 'Картой онлайн', sbp: 'СБП', 'courier-card': 'Картой при получении', cash: 'Наличными' })[p] || p;
 
 function orderStage(o) {
@@ -506,7 +500,7 @@ function openPoints() {
   const draw = () => {
     $('#modal').className = 'modal show';
     $('#modal').innerHTML = `
-      <button class="close-x" data-close>✕</button>
+      <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
       <div class="pts">
         <div class="pts__map">${mapSVG(sel)}</div>
         <div class="pts__list">
@@ -586,9 +580,10 @@ function renderCart() {
   const body = $('#sideCart .cart__body'), scroll = body ? body.scrollTop : 0;
   $('#sideCart').innerHTML = cartHTML(false);
   if ($('#sideCart .cart__body')) $('#sideCart .cart__body').scrollTop = scroll;
+  if (state.route === 'cart' && $('#page .cart-page')) $('#page .cart-page').innerHTML = cartHTML(false);
   if ($('#drawer').dataset.view === 'cart') {
     const db = $('#drawer .cart__body'), ds = db ? db.scrollTop : 0;
-    $('#drawer').innerHTML = `<button class="close-x" data-close>✕</button>` + cartHTML(true);
+    $('#drawer').innerHTML = `<button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>` + cartHTML(true);
     if ($('#drawer .cart__body')) $('#drawer .cart__body').scrollTop = ds;
   }
   $$('[data-cart-total]').forEach(el => el.textContent = t.count ? rub(t.total) : 'Корзина');
@@ -603,7 +598,7 @@ function openProduct(id) {
   const m = $('#modal');
   m.className = 'modal';
   m.innerHTML = `
-    <button class="close-x" data-close>✕</button>
+    <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
     <div class="pm">
       <div class="pm__img" style="background:${p.img ? '#fff' : c.color}">${p.imgLarge ? `<img class="ic photo" src="${p.imgLarge}" alt="" onerror="this.onerror=null;this.className='ic';this.src='assets/icons/${p.icon}.webp'">` : ic(p.icon)}<div class="card__tags" style="left:16px;top:16px">${tagsHTML(p)}</div></div>
       <div class="pm__body">
@@ -655,13 +650,13 @@ function openCheckout() {
   m.className = 'modal modal--wide show';
   showOverlay();
   m.innerHTML = `
-    <button class="close-x" data-close>✕</button>
+    <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
     <form class="checkout" id="checkoutForm" novalidate>
       <div class="checkout__form">
         <h2 class="checkout__title">Оформление заказа</h2>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">1</span>${pickup ? 'Самовывоз' : 'Адрес доставки'} · ${pt.city}</div>
-          ${pickup ? `<div class="pickup-box">${ic('store', '')}<div><b>${pt.address}</b><div style="font-size:13px;color:var(--text-2)">${hours(pt)} · ${pt.phone}</div></div></div>` : `
+          ${pickup ? `<div class="pickup-box">${svgI('store', 26)}<div><b>${pt.address}</b><div style="font-size:13px;color:var(--text-2)">${hours(pt)} · ${pt.phone}</div></div></div>` : `
           <div class="row row--3">
             <div class="field"><input name="street" placeholder=" " value="${f.street || ''}"><label>Улица</label></div>
             <div class="field"><input name="house" placeholder=" " value="${f.house || ''}"><label>Дом</label></div>
@@ -689,8 +684,8 @@ function openCheckout() {
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">4</span>Оплата</div>
           <div class="opts">
-            ${[['card', 'card', 'Картой онлайн', 'Visa, MC, МИР'], ['sbp', 'voltage', 'СБП', 'По QR-коду'], ['courier-card', 'pager', pickup ? 'Картой на кассе' : 'Картой курьеру', 'Терминал'], ['cash', 'cash', 'Наличными', 'При получении']]
-              .map(([id, icon, ti, su]) => `<button type="button" class="opt ${f.pay === id ? 'active' : ''}" data-pay="${id}">${ic(icon, '')}<span class="opt__title">${ti}</span><span class="opt__sub">${su}</span></button>`).join('')}
+            ${[['card', 'card', 'Картой онлайн', 'Visa, MC, МИР'], ['sbp', 'qr', 'СБП', 'По QR-коду'], ['courier-card', 'terminal', pickup ? 'Картой на кассе' : 'Картой курьеру', 'Терминал'], ['cash', 'cash', 'Наличными', 'При получении']]
+              .map(([id, icon, ti, su]) => `<button type="button" class="opt ${f.pay === id ? 'active' : ''}" data-pay="${id}">${svgI(icon, 24)}<span class="opt__title">${ti}</span><span class="opt__sub">${su}</span></button>`).join('')}
           </div>
           <div id="payExtra"></div>
         </div>
@@ -824,13 +819,13 @@ function openTracking(id) {
     const st = orderStage(o);
     const scheduled = o.slot && o.slot !== 'asap' && st === 0;
     m.innerHTML = `
-      <button class="close-x" data-close>✕</button>
+      <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
       <div class="success">
-        ${ic(steps[st][0], 'success__icon')}
+        <span class="success__icon">${svgI(steps[st][0], 56)}</span>
         <h2>Заказ №${o.id}</h2>
         <p>${scheduled ? `Доставим ${new Date(o.slot).toLocaleString('ru-RU', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}` : `${steps[st][1]} · ${o.address}`}</p>
-        <div class="track">${steps.map((s, i) => `<div class="track__step ${i < st ? 'done' : i === st ? 'cur' : ''}"><span class="track__dot">${ic(s[0])}</span>${s[1]}</div>`).join('')}</div>
-        ${o.mode !== 'pickup' && st === 2 ? `<div class="courier"><span class="courier__ava">${ic('scooter')}</span><div style="flex:1"><div class="courier__name">Курьер Ислам</div><div class="courier__meta">Будет через ~${Math.max(3, 15 - Math.round((Date.now() - o.createdAt) / 6000))} мин</div></div><a class="btn btn--ghost btn--sm" href="tel:+${pt.phone.replace(/\D/g, '')}">Позвонить</a></div>` : ''}
+        <div class="track">${steps.map((s, i) => `<div class="track__step ${i < st ? 'done' : i === st ? 'cur' : ''}"><span class="track__dot">${svgI(s[0], 18)}</span>${s[1]}</div>`).join('')}</div>
+        ${o.mode !== 'pickup' && st === 2 ? `<div class="courier"><span class="courier__ava">${svgI('moped', 24)}</span><div style="flex:1"><div class="courier__name">Курьер Ислам</div><div class="courier__meta">Будет через ~${Math.max(3, 15 - Math.round((Date.now() - o.createdAt) / 6000))} мин</div></div><a class="btn btn--ghost btn--sm" href="tel:+${pt.phone.replace(/\D/g, '')}">Позвонить</a></div>` : ''}
         <div class="totals" style="margin-top:18px;text-align:left">
           
           <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
@@ -892,12 +887,12 @@ function closeAll() {
   clearInterval(trackTimer);
 }
 function openCart() {
-  if (isDesktopCart()) { closeAll(); return; }
-  $('#modal').classList.remove('show');
-  $('#drawer').dataset.view = 'cart';
-  renderCart();
-  $('#drawer').classList.add('show');
-  showOverlay();
+  closeAll();
+  if (state.route === 'cart') { renderPage(); window.scrollTo(0, 0); }
+  else location.hash = '#/cart';
+}
+function renderCartPage() {
+  $('#page').innerHTML = `<div class="cart-page">${cartHTML(false)}</div>`;
 }
 
 function toast(msg, action) {
