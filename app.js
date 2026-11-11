@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794398096';
+const BUILD = '1794398589';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -162,7 +162,7 @@ function filtered() {
 }
 function sortList(list, sort) {
   const sorters = {
-    pop: (a, b) => b.popularity - a.popularity,
+    pop: (a, b) => (!!b.img - !!a.img) || b.popularity - a.popularity,
     asc: (a, b) => a.price - b.price,
     desc: (a, b) => b.price - a.price,
     name: (a, b) => a.name.localeCompare(b.name, 'ru'),
