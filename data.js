@@ -16,6 +16,7 @@ const PRODUCTS = (() => {
   const catMap = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
   return window.CATALOG.items.map(([id, name, price, cat, sub, img, kg, qty, offers, imgL, old], rank) => {
     const c = catMap[cat];
+    if (!img) { const own = (offers || []).map(f => (window.PHOTOS || {})[f[0] + ':' + f[1]]).find(Boolean); if (own) { img = own; imgL = own; } }
     const subName = sub == null ? null : c.subs[sub];
     return {
       id: 'p' + id, cat, sub: subName, name, price, oldPrice: old || 0,
