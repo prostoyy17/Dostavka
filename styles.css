@@ -846,3 +846,4 @@ body.sub .top { display: none; }
 :root[data-theme="dark"] .fav-btn { filter: none; }
 .tabgap { height: 28px; }
 .cart-page { padding-top: 9px; }
+.tabbar .phi { width: 21px; height: 21px; }
