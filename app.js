@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794398589';
+const BUILD = '1794401232';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -323,7 +323,7 @@ function renderPoint() {
   if (!pt) { $('#pointCard').innerHTML = `<button class="btn btn--primary btn--sm btn--block" data-action="open-points">Выбрать склад</button>`; return; }
   $('#pointCard').innerHTML = `
     <div class="point-card__title"><span class="status-dot ${isOpen(pt) ? '' : 'closed'}"></span>Доставка по Грозному</div>
-    <div class="point-card__row"><span>Товары из</span><b>${pt.store}</b></div>
+    <div class="point-card__row"><span>Магазинов</span><b>${STORES.length}</b></div>
     <div class="point-card__row"><span>Часы</span><b>${hours(pt)}</b></div>
     <div class="point-card__row"><span>Доставка</span><b>${pt.eta}</b></div>
     <div class="point-card__row"><span>Бесплатно от</span><b>${rub(pt.freeFrom)}</b></div>${pt.minOrder ? `
@@ -366,7 +366,7 @@ function openPoints() {
             const n = PRODUCTS.filter(x => x.stock[p.id] > 0).length;
             return `<button class="pt ${p.id === sel ? 'active' : ''}" data-pick="${p.id}">
               <span class="pt__city">${p.city}</span>
-              <span class="pt__addr">${p.store} · ${p.address}</span>
+              <span class="pt__addr">Товары из магазинов: ${p.store}</span>
               <span class="pt__eta">${p.eta}<small class="${open ? '' : 'closed'}">${open ? 'Открыто' : 'Закрыто'}</small></span>
               <span class="pt__info">${hours(p)} · ${n.toLocaleString('ru-RU')} товаров · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно${p.minOrder ? ` · заказ от ${rub(p.minOrder)}` : ''}</span>
             </button>`;
@@ -463,7 +463,8 @@ function openProduct(id) {
           ${p.sub ? `<span>${esc(p.sub)}</span>` : ''}
         </div>
         <div class="pm__stock">
-          <div class="pm__stock-row current"><span>Наличие</span><b>${s ? (s > 20 ? 'В наличии' : `${s} ${p.kg ? 'кг' : 'шт'}`) : 'Нет'}</b></div>
+          ${p.offers.map((o, i) => `<div class="pm__stock-row ${i === 0 ? 'current' : ''}"><span>${esc(STORES[o[0]].name)}</span><b>${rubP(o[2])}${i === 0 && p.offers.length > 1 ? ' · дешевле' : ''}</b></div>`).join('')}
+          <div class="pm__stock-row"><span>Наличие</span><b>${s ? (s > 20 ? 'В наличии' : `${s} ${p.kg ? 'кг' : 'шт'}`) : 'Нет'}</b></div>
         </div>
         <div class="pm__buy">
           <div>
@@ -651,7 +652,7 @@ function placeOrder(f) {
   const t = totals();
   const order = {
     id: String(Date.now()).slice(-6), createdAt: Date.now(), point: state.point, mode: state.mode,
-    items: t.okLines.map(l => ({ id: l.p.id, qty: l.qty, price: l.p.price })),
+    items: t.okLines.map(l => ({ id: l.p.id, name: l.p.name, qty: l.qty, price: l.p.price, offers: l.p.offers })),
     total: t.total + (f.pickup ? 0 : f.tip), pay: f.pay, slot: f.slot,
     address: f.pickup ? point().address : `${f.street}, ${f.house}${f.apt ? ', кв. ' + f.apt : ''}`
   };
@@ -681,7 +682,7 @@ function openTracking(id) {
         <div class="track">${steps.map((s, i) => `<div class="track__step ${i < st ? 'done' : i === st ? 'cur' : ''}"><span class="track__dot">${ic(s[0])}</span>${s[1]}</div>`).join('')}</div>
         ${o.mode !== 'pickup' && st === 2 ? `<div class="courier"><span class="courier__ava">${ic('scooter')}</span><div style="flex:1"><div class="courier__name">Курьер Ислам</div><div class="courier__meta">Будет через ~${Math.max(3, 15 - Math.round((Date.now() - o.createdAt) / 6000))} мин</div></div><a class="btn btn--ghost btn--sm" href="tel:+${pt.phone.replace(/\D/g, '')}">Позвонить</a></div>` : ''}
         <div class="totals" style="margin-top:18px;text-align:left">
-          <div class="totals__row"><span>Магазин</span><b>${pt.store}, ${pt.address}</b></div>
+          
           <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
           <div class="totals__row totals__row--total"><span>Сумма</span><b>${rub(o.total)}</b></div>
         </div>
