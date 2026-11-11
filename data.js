@@ -1,10 +1,10 @@
-// Магазин-источник ассортимента и параметры доставки.
-// Параметры доставки (часы, время, суммы) — значения по умолчанию, их задаёт владелец сервиса.
+// Параметры доставки задаёт владелец сервиса. minOrder: 0 — без минимальной суммы заказа.
+const STORES = window.CATALOG.meta.stores;
 const POINTS = [
   {
-    id: 'msf', city: 'Грозный', store: 'Musafir Market', address: 'ул. Сайханова, 101а',
-    hours: [9, 21], eta: '60–90 мин', minOrder: 1000, deliveryFee: 200, freeFrom: 3000,
-    phone: '+7 (965) 952-54-34', x: 262, y: 118,
+    id: 'grz', city: 'Грозный', store: STORES.map(s => s.name).join(', '), address: 'Грозный',
+    hours: [9, 21], eta: '60–90 мин', minOrder: 0, deliveryFee: 200, freeFrom: 3000,
+    phone: '', x: 262, y: 118,
     zones: ['Ахматовский', 'Байсангуровский', 'Висаитовский', 'Шейх-Мансуровский']
   }
 ];
@@ -12,17 +12,17 @@ const POINTS = [
 const CATEGORIES = window.CATALOG.cats.map(c => ({ id: c.id, name: c.name, icon: c.icon, color: c.color, subs: c.subs }));
 
 const PRODUCTS = (() => {
-  const base = window.CATALOG.meta.imgBase;
   const N = window.CATALOG.items.length;
-  return window.CATALOG.items.map(([id, name, price, cat, sub, img, kg, qty, link, old], rank) => {
-    const c = CATEGORIES.find(x => x.id === cat);
+  const catMap = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
+  return window.CATALOG.items.map(([id, name, price, cat, sub, img, kg, qty, offers, imgL, old], rank) => {
+    const c = catMap[cat];
+    const subName = sub == null ? null : c.subs[sub];
     return {
-      id: 'm' + id, cat, sub: sub == null ? null : c.subs[sub], name, price, oldPrice: old || 0,
-      icon: c.icon, img: img ? base + img.replace('/~', '/medium_') : null,
-      imgLarge: img ? base + img.replace('/~', '/large_') : null,
+      id: 'p' + id, cat, sub: subName, name, price, oldPrice: old || 0,
+      icon: c.icon, img: img || null, imgLarge: imgL || img || null,
       unit: kg ? 'за 1 кг' : '', kg: !!kg,
-      stock: { msf: qty }, popularity: N - rank, link,
-      search: (name + ' ' + c.name + ' ' + (sub == null ? '' : c.subs[sub])).toLowerCase().replace(/ё/g, 'е')
+      stock: { grz: qty }, popularity: N - rank, offers,
+      search: (name + ' ' + c.name + ' ' + (subName || '')).toLowerCase().replace(/ё/g, 'е')
     };
   });
 })();
