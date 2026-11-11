@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794423174';
+const BUILD = '1794424415';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -53,7 +53,7 @@ const isOpen = pt => { const h = new Date().getHours(); return h >= pt.hours[0] 
 const hours = pt => `${String(pt.hours[0]).padStart(2, '0')}:00–${pt.hours[1]}:00`;
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c; };
 const heart = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20s-7.5-4.6-9.3-9.2C1.4 7.4 3.6 4 7 4c2 0 3.4 1.1 5 3 1.6-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8C19.5 15.4 12 20 12 20z"/></svg>';
-const isDesktopCart = () => matchMedia('(min-width: 1361px)').matches;
+const isDesktopCart = () => false;   // корзина всегда открывается шторкой
 
 function applyTheme() {
   const t = state.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -97,6 +97,11 @@ function setQty(id, qty) {
 function actionHTML(p, size = '') {
   const q = state.cart[p.id] || 0;
   const s = stockOf(p);
+  if (size.includes('round')) {
+    if (s === 0) return '';
+    if (!q) return `<button class="add-btn add-btn--round" data-add="${p.id}" aria-label="В корзину"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></button>`;
+    return `<div class="stepper stepper--round"><button data-dec="${p.id}" aria-label="Меньше">−</button><span>${q}</span><button data-inc="${p.id}" aria-label="Больше" ${q >= s ? 'disabled' : ''}>+</button></div>`;
+  }
   if (s === 0) return `<button class="add-btn" disabled>Нет в наличии</button>`;
   if (!q) return `<button class="add-btn ${size.includes('primary') ? 'add-btn--primary' : ''}" data-add="${p.id}">+ В корзину</button>`;
   return `<div class="stepper ${size}">
@@ -111,17 +116,17 @@ function tagsHTML(p) {
 function cardHTML(p) {
   const s = stockOf(p);
   return `<article class="card ${s === 0 ? 'out' : ''}">
-    <div class="card__img ${p.img ? 'card__img--photo' : ''}" style="background:${p.img ? '#fff' : catById[p.cat].color}" data-open="${p.id}">
+    <div class="card__img ${p.img ? 'card__img--photo' : 'card__img--icon'}" style="--tint:${catById[p.cat].color}" data-open="${p.id}">
       ${pic(p)}
       <div class="card__tags">${s === 0 ? '<span class="tag tag--out">Нет в наличии</span>' : tagsHTML(p)}</div>
+      <button class="fav-btn ${isFav(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="В избранное">${heart}</button>
+      <div class="card__action" data-action-for="${p.id}" data-size="round">${actionHTML(p, 'round')}</div>
     </div>
-    <button class="fav-btn ${isFav(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="В избранное">${heart}</button>
     <div class="card__price">
       <span class="price">${rubP(p.price)}</span>${p.oldPrice > p.price ? `<span class="price-old">${rubP(p.oldPrice)}</span>` : ''}
     </div>
     <div class="card__name" data-open="${p.id}" title="${esc(p.name)}">${esc(p.name)}</div>
     <div class="card__unit"><span>${p.unit}</span>${s > 0 && s <= 5 ? `<span class="card__low">осталось ${s}</span>` : ''}</div>
-    <div class="card__action" data-action-for="${p.id}">${actionHTML(p)}</div>
   </article>`;
 }
 function refreshQty(id) {
@@ -179,10 +184,11 @@ const sortSelect = (id, val, extra = '') => `<select class="select" id="${id}">
 function renderCatalogPage() {
   const page = $('#page');
   const title = state.query ? `Поиск «${esc(state.query)}»` : state.cat === 'all' ? 'Все товары' : catById[state.cat].name;
+  const home = state.cat === 'all' && !state.query;
   page.innerHTML = `
-    <div class="cat-strip" id="catStrip"></div>
-    <div class="toolbar"><h1 class="toolbar__title">${title}</h1></div>
-    <div class="controls" id="controls"></div>
+    <div class="circles" id="catStrip"></div>
+    ${home ? '' : `<div class="toolbar"><h1 class="toolbar__title">${title}</h1></div>
+    <div class="controls" id="controls"></div>`}
     <div id="catalog"></div>`;
   renderCatStrip();
   renderControls();
@@ -229,7 +235,7 @@ function renderCatalog() {
     root.innerHTML = `<div class="empty">${ic('search', 'empty__icon')}<div class="empty__title">Ничего не найдено</div><button class="btn btn--ghost btn--sm" data-action="reset">Сбросить фильтры</button></div>`;
     return;
   }
-  const grouped = state.cat === 'all' && !state.query && state.sort === 'pop' && !state.filters.size;
+  const grouped = state.cat === 'all' && !state.query;
   if (!grouped) {
     const shown = list.slice(0, state.limit);
     root.innerHTML = `<div class="list-meta">${list.length.toLocaleString('ru-RU')} ${plural(list.length, 'товар', 'товара', 'товаров')}</div><div class="grid">${shown.map(cardHTML).join('')}</div>` +
@@ -237,15 +243,22 @@ function renderCatalog() {
     return;
   }
 
-  let html = '';
+  // Главная: рекомендации (случайные товары с фото, на время визита) + подборки по разделам
+  if (!RECS) {
+    const pool = PRODUCTS.filter(p => p.img && stockOf(p) > 0);
+    RECS = [];
+    for (let i = 0; i < 10 && pool.length; i++) RECS.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  let html = `<section class="section"><div class="section__head"><h2 class="section__title">Рекомендации для вас</h2><button class="section__more" data-action="reshuffle">Обновить</button></div><div class="grid">${RECS.map(cardHTML).join('')}</div></section>`;
   CATEGORIES.forEach(c => {
-    const items = list.filter(p => p.cat === c.id).sort((a, b) => !!b.img - !!a.img);
+    const items = list.filter(p => p.cat === c.id && p.img && stockOf(p) > 0).sort((a, b) => b.popularity - a.popularity);
     if (!items.length) return;
-    html += `<section class="section"><div class="section__head"><h2 class="section__title">${ic(c.icon, '')}${c.name}</h2><button class="section__more" data-cat="${c.id}">Все ${items.length}</button></div><div class="grid">${items.slice(0, 8).map(cardHTML).join('')}</div></section>`;
+    html += `<section class="section"><div class="section__head"><h2 class="section__title">${c.name}</h2><button class="section__more" data-cat="${c.id}">Все<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 6 6 6-6 6"/></svg></button></div><div class="hrow">${items.slice(0, 12).map(cardHTML).join('')}</div></section>`;
   });
   root.innerHTML = html;
 }
 
+let RECS = null;
 function catItems() {
   return [{ id: 'all', name: 'Все товары', icon: 'cart' }, ...CATEGORIES];
 }
@@ -265,7 +278,7 @@ function renderCats() {
 }
 function renderCatStrip() {
   const s = $('#catStrip');
-  if (s) s.innerHTML = catItems().map(c => `<button class="cat-pill ${state.cat === c.id ? 'active' : ''}" data-cat="${c.id}">${ic(c.icon, '')}${c.name}</button>`).join('');
+  if (s) s.innerHTML = catItems().map(c => `<button class="circle ${state.cat === c.id ? 'active' : ''}" data-cat="${c.id}"><span class="circle__img" style="background:${c.color || 'var(--surface)'}">${ic(c.icon, '')}</span><span class="circle__name">${c.name}</span></button>`).join('');
 }
 
 /* ================= Favorites page ================= */
@@ -344,9 +357,11 @@ function renderOrders() {
 /* ================= Point ================= */
 function renderPoint() {
   const pt = point();
-  $('#pointCity').textContent = pt ? `${pt.city} · доставка` : 'Выберите адрес';
+  $('#pointCity').textContent = typeof WAREHOUSES_ENABLED !== 'undefined' && WAREHOUSES_ENABLED && pt ? `Склад ${pt.city}` : 'Доставка по Грозному';
+  const open = pt ? isOpen(pt) : false;
+  $('#pointDot').classList.toggle('off', !open);
   $('#pointMeta').textContent = pt
-    ? (state.mode === 'pickup' ? pt.address : (state.address.street ? `${state.address.street}, ${state.address.house || ''}` : `Доставка ${pt.eta}`))
+    ? (state.address.street ? `${state.address.street}, ${state.address.house || ''}` : (open ? `Сегодня до ${pt.hours[1]}:00 · ${pt.eta}` : `Завтра с ${String(pt.hours[0]).padStart(2, '0')}:00`))
     : 'Грозный';
   if (!pt) { $('#pointCard').innerHTML = `<button class="btn btn--primary btn--sm btn--block" data-action="open-points">Выбрать склад</button>`; return; }
   $('#pointCard').innerHTML = `
@@ -828,6 +843,7 @@ document.addEventListener('click', e => {
   if ((x = el('[data-action]'))) {
     const a = x.dataset.action;
     if (a === 'open-points') openPoints();
+    if (a === 'reshuffle') { RECS = null; renderCatalog(); }
     if (a === 'more') { state.limit += 60; const y = window.scrollY; renderCatalog(); window.scrollTo(0, y); }
     if (a === 'open-cart') openCart();
     if (a === 'toggle-theme') { state.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; LS.set('theme', state.theme); applyTheme(); }

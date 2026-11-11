@@ -1,3 +1,5 @@
+// Выбор складов в шапке. Пока складов нет — false (в шапке «Доставка по Грозному»).
+const WAREHOUSES_ENABLED = false;
 // Параметры доставки задаёт владелец сервиса. minOrder: 0 — без минимальной суммы заказа.
 const STORES = window.CATALOG.meta.stores;
 const POINTS = [
