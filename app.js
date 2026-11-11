@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794425019';
+const BUILD = '1794425772';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -298,7 +298,6 @@ function addressText() {
 function renderAccount() {
   $('#page').innerHTML = `${backBar()}
     <div class="acc">
-      <div class="acc__avatar"><svg viewBox="0 0 80 80" width="80" height="80"><circle cx="40" cy="30" r="15" fill="currentColor"/><path d="M12 72c3-15 15-23 28-23s25 8 28 23" fill="currentColor"/></svg></div>
       <button class="acc__login" data-action="login">Войти или зарегистрироваться</button>
       <a class="acc__card acc__row" href="#/address">
         <span class="acc__ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
