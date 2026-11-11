@@ -902,3 +902,8 @@ body.sub .top { display: none; }
   }
   :root[data-theme="dark"] .tabbar::before { background: rgba(28, 28, 31, .88); box-shadow: 0 10px 30px rgba(0, 0, 0, .5), inset 0 0 0 .5px rgba(255, 255, 255, .12); }
 }
+/* v14: без тени у капсулы — Safari обрезал тень по краям панели, получалась полупрозрачная полоса */
+@media (max-width: 760px) {
+  .tabbar::before { box-shadow: none !important; border: 1px solid rgba(14, 20, 51, .08); background: rgba(255, 255, 255, .94); }
+  :root[data-theme="dark"] .tabbar::before { box-shadow: none !important; border: 1px solid rgba(255, 255, 255, .1); background: rgba(28, 28, 31, .94); }
+}
