@@ -837,3 +837,4 @@ body.sub .top { display: none; }
 .acc__card .acc__row + .acc__row::before { content: ""; position: absolute; top: 0; left: 70px; right: 22px; height: 1px; background: var(--line); transform: scaleY(.5); transform-origin: top; }
 .acc__count { min-width: 24px; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); font-size: 13px; font-weight: 700; display: grid; place-items: center; }
 .tabbar { grid-template-columns: repeat(4, 1fr) !important; }
+.acc__credit { text-align: center; font-size: 12px; color: var(--text-3); } .acc__credit a { color: inherit; text-decoration: underline; }
