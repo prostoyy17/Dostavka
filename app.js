@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794427188';
+const BUILD = '1794429709';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -149,7 +149,7 @@ function parseRoute() {
 window.addEventListener('hashchange', () => { parseRoute(); closeAll(); renderPage(); window.scrollTo(0, 0); });
 
 function renderPage() {
-  const navOf = { address: 'account', about: 'account', settings: 'account' };
+  const navOf = { address: 'account', about: 'account', settings: 'account', orders: 'account' };
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (navOf[state.route] || state.route)));
   document.body.classList.toggle('sub', state.route !== 'catalog');
   renderCats();
@@ -317,6 +317,7 @@ function renderAccount() {
         <span class="acc__text"><small>Адрес доставки</small><b>${esc(addressText())}</b></span>${icoChev}
       </a>
       <div class="acc__card">
+        <a class="acc__row" href="#/orders">${tile('receipt', '', 'acc__tile')}<span class="acc__text"><b>Мои заказы</b></span>${state.orders.length ? `<span class="acc__count">${state.orders.length}</span>` : ''}${icoChev}</a>
         <a class="acc__row" href="#/settings">${tile('gear', 'slate', 'acc__tile')}<span class="acc__text"><b>Настройки</b></span>${icoChev}</a>
         <a class="acc__row" href="#/about">${tile('info', 'violet', 'acc__tile')}<span class="acc__text"><b>О сервисе</b></span>${icoChev}</a>
       </div>
