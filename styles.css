@@ -523,3 +523,14 @@ img { display: block; }
   .pm__related { padding: 0 16px 20px; }
   .toasts { bottom: calc(76px + env(safe-area-inset-bottom)); width: calc(100% - 32px); }
 }
+
+/* ================= Real catalog ================= */
+.card__img, .pm__img, .cart-item__img, .summary-item__img, .order__icons span { position: relative; overflow: hidden; }
+img.photo { position: absolute; left: 6%; top: 6%; width: 88% !important; height: 88% !important; object-fit: contain; }
+.card__img--photo { border: 1px solid var(--line); }
+.pm__img img.photo { left: 10%; top: 10%; width: 80% !important; height: 80% !important; }
+.filters__sep { width: 1px; height: 24px; background: var(--line); align-self: center; margin: 0 4px; flex-shrink: 0; }
+.list-meta { font-size: 13px; color: var(--text-3); margin: -6px 0 12px; }
+.more { display: flex; justify-content: center; margin: 20px 0 8px; }
+.more .btn { min-width: 260px; }
+.card__name { word-break: break-word; }

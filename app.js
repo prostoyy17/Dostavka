@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1793790530';
+const BUILD = '1794396436';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -23,8 +23,10 @@ const state = {
   route: 'catalog',
   cat: 'all',
   query: '',
+  sub: null,
   filters: new Set(),
   sort: 'pop',
+  limit: 60,
   favSort: 'added'
 };
 
@@ -39,8 +41,13 @@ const save = () => {
   LS.set('cart', state.cart); LS.set('favs', state.favs); LS.set('orders', state.orders);
   LS.set('point', state.point); LS.set('mode', state.mode);
 };
+if (!POINTS.some(p => p.id === state.point)) state.point = POINTS.length === 1 ? POINTS[0].id : null;
+state.mode = 'delivery';
 const point = () => POINTS.find(p => p.id === state.point);
-const stockOf = (p, pid = state.point) => pid ? p.stock[pid] : 99;
+const stockOf = (p, pid = state.point || POINTS[0].id) => p ? (p.stock[pid] || 0) : 0;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const rubP = n => (Math.round(n * 100) / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '\u00a0₽';
+const pic = (p, cls = 'ic') => p.img ? `<img class="${cls} photo" src="${p.img}" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.className='${cls}';this.src='assets/icons/${p.icon}.webp'">` : ic(p.icon, cls);
 const isOpen = pt => { const h = new Date().getHours(); return h >= pt.hours[0] && h < pt.hours[1]; };
 const hours = pt => `${String(pt.hours[0]).padStart(2, '0')}:00–${pt.hours[1]}:00`;
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c; };
@@ -68,7 +75,7 @@ function totals() {
   const pt = point() || POINTS[0];
   const isPickup = state.mode === 'pickup';
   const delivery = isPickup || subtotal >= pt.freeFrom || subtotal === 0 ? 0 : pt.deliveryFee;
-  const service = subtotal > 0 ? 19 : 0;
+  const service = 0;
   const total = subtotal + delivery + service;
   return { lines, okLines, count, subtotal, delivery, service, total, pt, minOk: subtotal >= pt.minOrder, isPickup, toFree: Math.max(0, pt.freeFrom - subtotal) };
 }
@@ -78,12 +85,11 @@ function setQty(id, qty) {
   const max = stockOf(p);
   const prev = state.cart[id] || 0;
   qty = Math.max(0, Math.min(qty, max));
-  if (qty === prev && qty >= max && qty > 0) { toast('Больше нет на складе'); return; }
+  if (qty === prev && qty >= max && qty > 0) { toast('Больше нет в наличии'); return; }
   if (qty === 0) delete state.cart[id]; else state.cart[id] = qty;
   save();
   refreshQty(id);
   renderCart();
-  if (qty > prev && prev === 0 && !state.point) openPoints();
 }
 
 /* ================= Product card ================= */
@@ -99,24 +105,21 @@ function actionHTML(p, size = '') {
   </div>`;
 }
 function tagsHTML(p) {
-  const t = [];
-  if (p.tags.includes('halal')) t.push('<span class="tag tag--halal">Халяль</span>');
-  else if (p.tags.includes('local')) t.push('<span class="tag tag--local">Местное</span>');
-  return t.slice(0, 2).join('');
+  return p.oldPrice > p.price ? `<span class="tag tag--sale">−${Math.round((1 - p.price / p.oldPrice) * 100)}%</span>` : '';
 }
 function cardHTML(p) {
   const s = stockOf(p);
   return `<article class="card ${s === 0 ? 'out' : ''}">
-    <div class="card__img" style="background:${catById[p.cat].color}" data-open="${p.id}">
-      ${ic(p.icon)}
+    <div class="card__img ${p.img ? 'card__img--photo' : ''}" style="background:${p.img ? '#fff' : catById[p.cat].color}" data-open="${p.id}">
+      ${pic(p)}
       <div class="card__tags">${s === 0 ? '<span class="tag tag--out">Нет в наличии</span>' : tagsHTML(p)}</div>
     </div>
     <button class="fav-btn ${isFav(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="В избранное">${heart}</button>
     <div class="card__price">
-      <span class="price">${rub(p.price)}</span>
+      <span class="price">${rubP(p.price)}</span>${p.oldPrice > p.price ? `<span class="price-old">${rubP(p.oldPrice)}</span>` : ''}
     </div>
-    <div class="card__name" data-open="${p.id}">${p.name}</div>
-    <div class="card__unit"><span>${p.unit}</span>${state.point && s > 0 && s <= 5 ? `<span class="card__low">осталось ${s}</span>` : ''}</div>
+    <div class="card__name" data-open="${p.id}" title="${esc(p.name)}">${esc(p.name)}</div>
+    <div class="card__unit"><span>${p.unit}</span>${s > 0 && s <= 5 ? `<span class="card__low">осталось ${s}</span>` : ''}</div>
     <div class="card__action" data-action-for="${p.id}">${actionHTML(p)}</div>
   </article>`;
 }
@@ -146,13 +149,13 @@ function renderPage() {
 
 /* ================= Catalog page ================= */
 function filtered() {
-  const q = state.query.trim().toLowerCase();
+  const words = state.query.toLowerCase().replace(/ё/g, 'е').split(/\s+/).filter(Boolean);
   const list = PRODUCTS.filter(p => {
     if (state.cat !== 'all' && p.cat !== state.cat) return false;
-    if (q && !(p.name.toLowerCase().includes(q) || catById[p.cat].name.toLowerCase().includes(q))) return false;
-    if (state.filters.has('halal') && !p.tags.includes('halal')) return false;
-    if (state.filters.has('local') && !p.tags.includes('local')) return false;
-    if (state.filters.has('instock') && stockOf(p) === 0) return false;
+    if (state.sub && p.sub !== state.sub) return false;
+    if (words.length && !words.every(w => p.search.includes(w))) return false;
+    if (state.filters.has('photo') && !p.img) return false;
+    if (state.filters.has('kg') && !p.kg) return false;
     return true;
   });
   return sortList(list, state.sort);
@@ -174,7 +177,7 @@ const sortSelect = (id, val, extra = '') => `<select class="select" id="${id}">
 
 function renderCatalogPage() {
   const page = $('#page');
-  const title = state.query ? `Поиск «${state.query}»` : state.cat === 'all' ? 'Все товары' : catById[state.cat].name;
+  const title = state.query ? `Поиск «${esc(state.query)}»` : state.cat === 'all' ? 'Все товары' : catById[state.cat].name;
   page.innerHTML = `
     <div class="cat-strip" id="catStrip"></div>
     <div class="toolbar">
@@ -182,7 +185,8 @@ function renderCatalogPage() {
       <div class="toolbar__controls">${sortSelect('sortSelect', state.sort)}</div>
     </div>
     <div class="filters">
-      ${[['halal', 'Халяль'], ['local', 'Местное'], ['instock', 'В наличии']].map(([f, l]) => `<button class="chip ${state.filters.has(f) ? 'active' : ''}" data-filter="${f}">${l}</button>`).join('')}
+      ${[['photo', 'С фото'], ['kg', 'Весовые']].map(([f, l]) => `<button class="chip ${state.filters.has(f) ? 'active' : ''}" data-filter="${f}">${l}</button>`).join('')}
+      ${state.cat !== 'all' && catById[state.cat].subs.length ? `<span class="filters__sep"></span>` + [null, ...catById[state.cat].subs].map(s => `<button class="chip ${state.sub === s ? 'active' : ''}" data-sub="${s == null ? '' : esc(s)}">${s == null ? 'Все' : esc(s)}</button>`).join('') : ''}
     </div>
     <div id="catalog"></div>`;
   renderCatStrip();
@@ -198,11 +202,17 @@ function renderCatalog() {
     return;
   }
   const grouped = state.cat === 'all' && !state.query && state.sort === 'pop' && !state.filters.size;
-  if (!grouped) { root.innerHTML = `<div class="grid">${list.map(cardHTML).join('')}</div>`; return; }
+  if (!grouped) {
+    const shown = list.slice(0, state.limit);
+    root.innerHTML = `<div class="list-meta">${list.length.toLocaleString('ru-RU')} ${plural(list.length, 'товар', 'товара', 'товаров')}</div><div class="grid">${shown.map(cardHTML).join('')}</div>` +
+      (list.length > shown.length ? `<div class="more"><button class="btn btn--ghost" data-action="more">Показать ещё ${Math.min(60, list.length - shown.length)} из ${(list.length - shown.length).toLocaleString('ru-RU')}</button></div>` : '');
+    return;
+  }
 
   let html = '';
   CATEGORIES.forEach(c => {
-    const items = list.filter(p => p.cat === c.id);
+    const items = list.filter(p => p.cat === c.id).sort((a, b) => !!b.img - !!a.img);
+    if (!items.length) return;
     html += `<section class="section"><div class="section__head"><h2 class="section__title">${ic(c.icon, '')}${c.name}</h2><button class="section__more" data-cat="${c.id}">Все ${items.length}</button></div><div class="grid">${items.slice(0, 8).map(cardHTML).join('')}</div></section>`;
   });
   root.innerHTML = html;
@@ -285,13 +295,13 @@ function renderOrders() {
     <div class="orders">${state.orders.map(o => {
       const st = orderStage(o);
       const steps = o.mode === 'pickup' ? STEPS_PICKUP : STEPS_DELIVERY;
-      const pt = POINTS.find(p => p.id === o.point);
+      const pt = POINTS.find(p => p.id === o.point) || POINTS[0];
       return `<div class="order">
         <div class="order__head">
           <div><div class="order__num">№${o.id} · ${pt.city}</div><div class="order__date">${new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} · ${o.mode === 'pickup' ? 'самовывоз' : o.address}</div></div>
           <span class="order__status ${st === 3 ? 'done' : ''}">${steps[st][1]}</span>
         </div>
-        <div class="order__icons">${o.items.slice(0, 7).map(i => byId[i.id] ? `<span style="background:${catById[byId[i.id].cat].color}">${ic(byId[i.id].icon)}</span>` : '').join('')}${o.items.length > 7 ? `<em>+${o.items.length - 7}</em>` : ''}</div>
+        <div class="order__icons">${o.items.slice(0, 7).map(i => byId[i.id] ? `<span style="background:${byId[i.id].img ? '#fff' : catById[byId[i.id].cat].color}">${pic(byId[i.id])}</span>` : '').join('')}${o.items.length > 7 ? `<em>+${o.items.length - 7}</em>` : ''}</div>
         <div class="order__foot">
           <span class="order__sum">${rub(o.total)}</span>
           <span class="order__btns">
@@ -306,17 +316,18 @@ function renderOrders() {
 /* ================= Point ================= */
 function renderPoint() {
   const pt = point();
-  $('#pointCity').textContent = pt ? `${pt.city}${state.mode === 'pickup' ? ' · самовывоз' : ''}` : 'Выберите точку';
+  $('#pointCity').textContent = pt ? `${pt.city} · доставка` : 'Выберите адрес';
   $('#pointMeta').textContent = pt
     ? (state.mode === 'pickup' ? pt.address : (state.address.street ? `${state.address.street}, ${state.address.house || ''}` : `Доставка ${pt.eta}`))
-    : 'Грозный · Урус-Мартан · Шали';
+    : 'Грозный';
   if (!pt) { $('#pointCard').innerHTML = `<button class="btn btn--primary btn--sm btn--block" data-action="open-points">Выбрать склад</button>`; return; }
   $('#pointCard').innerHTML = `
-    <div class="point-card__title"><span class="status-dot ${isOpen(pt) ? '' : 'closed'}"></span>Склад ${pt.city}</div>
-    <div class="point-card__row"><span>Адрес</span><b>${pt.address}</b></div>
+    <div class="point-card__title"><span class="status-dot ${isOpen(pt) ? '' : 'closed'}"></span>Доставка по Грозному</div>
+    <div class="point-card__row"><span>Товары из</span><b>${pt.store}</b></div>
     <div class="point-card__row"><span>Часы</span><b>${hours(pt)}</b></div>
     <div class="point-card__row"><span>Доставка</span><b>${pt.eta}</b></div>
-    <div class="point-card__row"><span>Бесплатно от</span><b>${rub(pt.freeFrom)}</b></div>`;
+    <div class="point-card__row"><span>Бесплатно от</span><b>${rub(pt.freeFrom)}</b></div>
+    <div class="point-card__row"><span>Заказ от</span><b>${rub(pt.minOrder)}</b></div>`;
 }
 
 function mapSVG(sel) {
@@ -340,7 +351,7 @@ function mapSVG(sel) {
 }
 
 function openPoints() {
-  let sel = state.point || 'grz';
+  let sel = state.point || POINTS[0].id;
   let mode = state.mode;
   const draw = () => {
     $('#modal').className = 'modal show';
@@ -349,19 +360,15 @@ function openPoints() {
       <div class="pts">
         <div class="pts__map">${mapSVG(sel)}</div>
         <div class="pts__list">
-          <h2 class="pts__title">Выберите склад</h2>
-          <div class="mode-switch">
-            <button class="${mode === 'delivery' ? 'active' : ''}" data-mode="delivery">${ic('scooter', '')}Доставка</button>
-            <button class="${mode === 'pickup' ? 'active' : ''}" data-mode="pickup">${ic('store', '')}Самовывоз</button>
-          </div>
+          <h2 class="pts__title">Доставка по Грозному</h2>
           ${POINTS.map(p => {
             const open = isOpen(p);
             const n = PRODUCTS.filter(x => x.stock[p.id] > 0).length;
             return `<button class="pt ${p.id === sel ? 'active' : ''}" data-pick="${p.id}">
               <span class="pt__city">${p.city}</span>
-              <span class="pt__addr">${p.address}</span>
-              <span class="pt__eta">${mode === 'pickup' ? '~10 мин' : p.eta}<small class="${open ? '' : 'closed'}">${open ? 'Открыто' : 'Закрыто'}</small></span>
-              <span class="pt__info">${hours(p)} · ${n} товаров${mode === 'delivery' ? ` · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно` : ''}</span>
+              <span class="pt__addr">${p.store} · ${p.address}</span>
+              <span class="pt__eta">${p.eta}<small class="${open ? '' : 'closed'}">${open ? 'Открыто' : 'Закрыто'}</small></span>
+              <span class="pt__info">${hours(p)} · ${n.toLocaleString('ru-RU')} товаров · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно · заказ от ${rub(p.minOrder)}</span>
             </button>`;
           }).join('')}
           <button class="btn btn--primary btn--block" data-confirm-point>Готово</button>
@@ -379,7 +386,7 @@ function openPoints() {
       state.point = sel; state.mode = mode; save();
       closeAll(); renderAll();
       const bad = cartLines().filter(l => !l.ok).length;
-      toast(changed && bad ? `${bad} ${plural(bad, 'товар недоступен', 'товара недоступны', 'товаров недоступны')} на этом складе` : `Склад: ${point().city}`);
+      toast(changed && bad ? `${bad} ${plural(bad, 'товар недоступен', 'товара недоступны', 'товаров недоступны')}` : `Доставка: ${point().city}`);
     }
   };
 }
@@ -402,11 +409,11 @@ function cartHTML(inDrawer) {
       ${bad.length ? `<div class="danger-box"><span>${bad.length} ${plural(bad.length, 'товара', 'товаров', 'товаров')} нет на складе ${t.pt.city}</span><button data-action="remove-bad">Убрать</button></div>` : ''}
       ${t.lines.map(l => `
         <div class="cart-item ${l.ok ? '' : 'unavailable'}">
-          <div class="cart-item__img" style="background:${catById[l.p.cat].color}" data-open="${l.p.id}">${ic(l.p.icon)}</div>
+          <div class="cart-item__img" style="background:${l.p.img ? '#fff' : catById[l.p.cat].color}" data-open="${l.p.id}">${pic(l.p)}</div>
           <div>
-            <div class="cart-item__name">${l.p.name}</div>
-            <div class="cart-item__meta">${l.p.unit}</div>
-            ${l.ok ? `<div class="cart-item__price">${rub(l.sum)}</div>`
+            <div class="cart-item__name">${esc(l.p.name)}</div>
+            <div class="cart-item__meta">${rubP(l.p.price)}${l.p.kg ? ' / кг' : ''}</div>
+            ${l.ok ? `<div class="cart-item__price">${rubP(l.sum)}</div>`
               : `<div class="cart-item__warn">${l.avail ? `Осталось ${l.avail} шт` : 'Нет в наличии'}</div>`}
           </div>
           <div data-action-for="${l.p.id}" data-size="stepper--sm stepper--soft">${l.avail ? actionHTML(l.p, 'stepper--sm stepper--soft') : `<button class="cart__clear" data-remove="${l.p.id}">Удалить</button>`}</div>
@@ -414,9 +421,8 @@ function cartHTML(inDrawer) {
     </div>
     <div class="cart__foot">
       <div class="totals">
-        <div class="totals__row"><span>Товары, ${t.count} шт</span><b>${rub(t.subtotal)}</b></div>
+        <div class="totals__row"><span>Товары, ${t.lines.length} поз.</span><b>${rubP(t.subtotal)}</b></div>
         <div class="totals__row"><span>${t.isPickup ? 'Самовывоз' : 'Доставка'}</span><b>${t.delivery ? rub(t.delivery) : 'Бесплатно'}</b></div>
-        <div class="totals__row"><span>Сборка</span><b>${rub(t.service)}</b></div>
         <div class="totals__row totals__row--total"><span>Итого</span><b>${rub(t.total)}</b></div>
       </div>
       ${!t.minOk ? `<div class="warn-box">Минимальный заказ ${rub(t.pt.minOrder)}, не хватает ${rub(t.pt.minOrder - t.subtotal)}</div>` : ''}
@@ -442,27 +448,26 @@ function renderCart() {
 /* ================= Product modal ================= */
 function openProduct(id) {
   const p = byId[id], c = catById[p.cat];
-  const related = PRODUCTS.filter(x => x.cat === p.cat && x.id !== p.id && stockOf(x) > 0).sort((a, b) => b.popularity - a.popularity).slice(0, 4);
+  const related = PRODUCTS.filter(x => x.cat === p.cat && x.id !== p.id && stockOf(x) > 0).sort((a, b) => (b.sub === p.sub) - (a.sub === p.sub) || (!!b.img - !!a.img) || b.popularity - a.popularity).slice(0, 4);
+  const s = stockOf(p);
   const m = $('#modal');
   m.className = 'modal';
   m.innerHTML = `
     <button class="close-x" data-close>✕</button>
     <div class="pm">
-      <div class="pm__img" style="background:${c.color}">${ic(p.icon)}<div class="card__tags" style="left:16px;top:16px">${tagsHTML(p)}</div></div>
+      <div class="pm__img" style="background:${p.img ? '#fff' : c.color}">${p.imgLarge ? `<img class="ic photo" src="${p.imgLarge}" alt="" onerror="this.onerror=null;this.className='ic';this.src='assets/icons/${p.icon}.webp'">` : ic(p.icon)}<div class="card__tags" style="left:16px;top:16px">${tagsHTML(p)}</div></div>
       <div class="pm__body">
-        <div><h2 class="pm__name">${p.name}</h2><div class="pm__unit">${p.unit}</div></div>
+        <div><h2 class="pm__name">${esc(p.name)}</h2>${p.unit ? `<div class="pm__unit">Цена ${p.unit}</div>` : ''}</div>
         <div class="pm__meta">
-          <span>★ ${p.rating}</span>
-          ${p.kcal ? `<span>${p.kcal} ккал / 100 г</span>` : ''}
           <span>${ic(c.icon, '')}${c.name}</span>
+          ${p.sub ? `<span>${esc(p.sub)}</span>` : ''}
         </div>
-        <div class="pm__desc">${p.desc}</div>
         <div class="pm__stock">
-          ${POINTS.map(pt => `<div class="pm__stock-row ${pt.id === state.point ? 'current' : ''}"><span>${pt.city}</span><b>${p.stock[pt.id] ? (p.stock[pt.id] > 5 ? 'В наличии' : `${p.stock[pt.id]} шт`) : 'Нет'}</b></div>`).join('')}
+          <div class="pm__stock-row current"><span>Наличие</span><b>${s ? (s > 20 ? 'В наличии' : `${s} ${p.kg ? 'кг' : 'шт'}`) : 'Нет'}</b></div>
         </div>
         <div class="pm__buy">
           <div>
-            <div class="price">${rub(p.price)}</div>
+            <div class="price">${rubP(p.price)}</div>${p.oldPrice > p.price ? `<div class="price-old">${rubP(p.oldPrice)}</div>` : ''}
           </div>
           <div data-action-for="${p.id}" data-size="primary">${actionHTML(p, 'primary')}</div>
           <button class="pm__fav ${isFav(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="В избранное">${heart}</button>
@@ -554,7 +559,7 @@ function openCheckout() {
       <div class="checkout__side"><div class="checkout__side-inner">
         <div style="font-weight:800;font-size:18px">Ваш заказ</div>
         <div class="summary-items">
-          ${t.okLines.map(l => `<div class="summary-item"><span class="summary-item__img" style="background:${catById[l.p.cat].color}">${ic(l.p.icon)}</span><span class="summary-item__name">${l.p.name}</span><span>×${l.qty}</span><b>${rub(l.sum)}</b></div>`).join('')}
+          ${t.okLines.map(l => `<div class="summary-item"><span class="summary-item__img" style="background:${l.p.img ? '#fff' : catById[l.p.cat].color}">${pic(l.p)}</span><span class="summary-item__name">${esc(l.p.name)}</span><span>×${l.qty}${l.p.kg ? ' кг' : ''}</span><b>${rubP(l.sum)}</b></div>`).join('')}
         </div>
         <div class="totals" id="checkoutTotals"></div>
         <button class="btn btn--primary btn--block btn--between" type="submit" id="payBtn"></button>
@@ -567,9 +572,8 @@ function openCheckout() {
     const tt = totals();
     const sum = tt.total + (pickup ? 0 : f.tip);
     $('#checkoutTotals').innerHTML = `
-      <div class="totals__row"><span>Товары</span><b>${rub(tt.subtotal)}</b></div>
+      <div class="totals__row"><span>Товары</span><b>${rubP(tt.subtotal)}</b></div>
       <div class="totals__row"><span>${pickup ? 'Самовывоз' : 'Доставка'}</span><b>${tt.delivery ? rub(tt.delivery) : 'Бесплатно'}</b></div>
-      <div class="totals__row"><span>Сборка</span><b>${rub(tt.service)}</b></div>
       ${f.tip && !pickup ? `<div class="totals__row"><span>Чаевые</span><b>${rub(f.tip)}</b></div>` : ''}
       <div class="totals__row totals__row--total"><span>К оплате</span><b>${rub(sum)}</b></div>`;
     $('#payBtn').innerHTML = `<span>${f.pay === 'card' || f.pay === 'sbp' ? 'Оплатить' : 'Заказать'}</span><span>${rub(sum)}</span>`;
@@ -662,7 +666,7 @@ let trackTimer = null;
 function openTracking(id) {
   const o = state.orders.find(x => x.id === id);
   if (!o) return;
-  const pt = POINTS.find(p => p.id === o.point);
+  const pt = POINTS.find(p => p.id === o.point) || POINTS[0];
   const steps = o.mode === 'pickup' ? STEPS_PICKUP : STEPS_DELIVERY;
   const m = $('#modal');
   const draw = () => {
@@ -677,7 +681,7 @@ function openTracking(id) {
         <div class="track">${steps.map((s, i) => `<div class="track__step ${i < st ? 'done' : i === st ? 'cur' : ''}"><span class="track__dot">${ic(s[0])}</span>${s[1]}</div>`).join('')}</div>
         ${o.mode !== 'pickup' && st === 2 ? `<div class="courier"><span class="courier__ava">${ic('scooter')}</span><div style="flex:1"><div class="courier__name">Курьер Ислам</div><div class="courier__meta">Будет через ~${Math.max(3, 15 - Math.round((Date.now() - o.createdAt) / 6000))} мин</div></div><a class="btn btn--ghost btn--sm" href="tel:+${pt.phone.replace(/\D/g, '')}">Позвонить</a></div>` : ''}
         <div class="totals" style="margin-top:18px;text-align:left">
-          <div class="totals__row"><span>Склад</span><b>${pt.city}, ${pt.address}</b></div>
+          <div class="totals__row"><span>Магазин</span><b>${pt.store}, ${pt.address}</b></div>
           <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
           <div class="totals__row totals__row--total"><span>Сумма</span><b>${rub(o.total)}</b></div>
         </div>
@@ -699,6 +703,7 @@ function repeatOrder(id) {
   const o = state.orders.find(x => x.id === id);
   let missing = 0;
   o.items.forEach(i => {
+    if (!byId[i.id]) { missing++; return; }
     const s = stockOf(byId[i.id]);
     const q = Math.min(s, (state.cart[i.id] || 0) + i.qty);
     if (q > 0) state.cart[i.id] = q;
@@ -741,7 +746,7 @@ function toast(msg, action) {
 
 /* ================= Events ================= */
 function goCatalog(cat) {
-  state.cat = cat;
+  state.cat = cat; state.sub = null; state.limit = 60;
   state.query = ''; $('#searchInput').value = '';
   if (state.route !== 'catalog') { location.hash = '#/'; return; }
   renderPage();
@@ -773,6 +778,12 @@ document.addEventListener('click', e => {
     const f = x.dataset.filter;
     state.filters.has(f) ? state.filters.delete(f) : state.filters.add(f);
     x.classList.toggle('active', state.filters.has(f));
+    state.limit = 60;
+    return renderCatalog();
+  }
+  if ((x = el('[data-sub]'))) {
+    state.sub = x.dataset.sub || null; state.limit = 60;
+    $$('[data-sub]').forEach(b => b.classList.toggle('active', (b.dataset.sub || null) === state.sub));
     return renderCatalog();
   }
   if ((x = el('[data-track]'))) return openTracking(x.dataset.track);
@@ -782,6 +793,7 @@ document.addEventListener('click', e => {
   if ((x = el('[data-action]'))) {
     const a = x.dataset.action;
     if (a === 'open-points') openPoints();
+    if (a === 'more') { state.limit += 60; const y = window.scrollY; renderCatalog(); window.scrollTo(0, y); }
     if (a === 'open-cart') openCart();
     if (a === 'toggle-theme') { state.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; LS.set('theme', state.theme); applyTheme(); }
     if (a === 'clear-cart') {
@@ -791,7 +803,7 @@ document.addEventListener('click', e => {
     }
     if (a === 'remove-bad') { cartLines().filter(l => !l.ok).forEach(l => l.avail ? state.cart[l.p.id] = l.avail : delete state.cart[l.p.id]); save(); renderAll(); }
     if (a === 'checkout') { $('#drawer').classList.remove('show'); $('#drawer').dataset.view = ''; openCheckout(); }
-    if (a === 'reset') { state.filters.clear(); state.query = ''; $('#searchInput').value = ''; goCatalog('all'); }
+    if (a === 'reset') { state.filters.clear(); state.sub = null; state.query = ''; $('#searchInput').value = ''; goCatalog('all'); }
     if (a === 'clear-favs') {
       const backup = [...state.favs];
       state.favs = []; save(); renderPage();
@@ -807,7 +819,7 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('change', e => {
-  if (e.target.id === 'sortSelect') { state.sort = e.target.value; renderCatalog(); }
+  if (e.target.id === 'sortSelect') { state.sort = e.target.value; state.limit = 60; renderCatalog(); }
   if (e.target.id === 'favSort') { state.favSort = e.target.value; renderFavorites(); }
 });
 $('#overlay').addEventListener('click', closeAll);
@@ -817,8 +829,9 @@ let searchT;
 $('#searchInput').addEventListener('input', e => {
   clearTimeout(searchT);
   searchT = setTimeout(() => {
-    state.query = e.target.value;
-    if (state.query) state.cat = 'all';
+    state.query = e.target.value.trim();
+    state.limit = 60;
+    if (state.query) { state.cat = 'all'; state.sub = null; }
     if (state.route !== 'catalog') { location.hash = '#/'; return; }
     renderPage();
   }, 200);
@@ -833,4 +846,5 @@ function renderAll() {
 parseRoute();
 renderAll();
 if (!state.point) openPoints();
+window.__CATALOG_OK = PRODUCTS.length;
 })();
