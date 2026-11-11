@@ -847,3 +847,10 @@ body.sub .top { display: none; }
 .tabgap { height: 28px; }
 .cart-page { padding-top: 9px; }
 .tabbar .phi { width: 21px; height: 21px; }
+/* v10: плоская кнопка «+» без теней */
+.add-btn--round, :root[data-theme="dark"] .add-btn--round { background: var(--accent) !important; color: #fff !important; box-shadow: none !important; }
+.add-btn--round:hover { transform: none; background: var(--accent) !important; }
+@media (hover: hover) { .add-btn--round:hover { background: var(--accent-2) !important; } }
+.add-btn--round:active { transform: scale(.92); }
+.stepper--round { box-shadow: none !important; }
+.add-btn--round .phi { width: 22px; height: 22px; }
