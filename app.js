@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794425772';
+const BUILD = '1794426062';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -141,12 +141,12 @@ function syncFav(id) {
 /* ================= Router ================= */
 function parseRoute() {
   const h = location.hash.replace(/^#\/?/, '');
-  state.route = ['favorites', 'orders', 'account', 'address', 'about'].find(r => h.startsWith(r)) || 'catalog';
+  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings'].find(r => h.startsWith(r)) || 'catalog';
 }
 window.addEventListener('hashchange', () => { parseRoute(); closeAll(); renderPage(); window.scrollTo(0, 0); });
 
 function renderPage() {
-  const navOf = { address: 'account', about: 'account' };
+  const navOf = { address: 'account', about: 'account', settings: 'account' };
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (navOf[state.route] || state.route)));
   document.body.classList.toggle('sub', state.route !== 'catalog');
   renderCats();
@@ -155,6 +155,7 @@ function renderPage() {
   if (state.route === 'account') return renderAccount();
   if (state.route === 'address') return renderAddress();
   if (state.route === 'about') return renderAbout();
+  if (state.route === 'settings') return renderSettings();
   renderCatalogPage();
 }
 
@@ -237,7 +238,7 @@ function renderCatalog() {
   if (!root) return;
   const list = filtered();
   if (!list.length) {
-    root.innerHTML = `<div class="empty">${ic('search', 'empty__icon')}<div class="empty__title">Ничего не найдено</div><button class="btn btn--ghost btn--sm" data-action="reset">Сбросить фильтры</button></div>`;
+    root.innerHTML = `<div class="empty">${tile('search', 'blue', 'empty__tile')}<div class="empty__title">Ничего не найдено</div><button class="btn btn--ghost btn--sm" data-action="reset">Сбросить фильтры</button></div>`;
     return;
   }
   const grouped = state.cat === 'all' && !state.query;
@@ -286,6 +287,20 @@ function renderCatStrip() {
   if (s) s.innerHTML = catItems().map(c => `<button class="circle ${state.cat === c.id ? 'active' : ''}" data-cat="${c.id}"><span class="circle__img" style="background:${c.color || 'var(--surface)'}">${ic(c.icon, '')}</span><span class="circle__name">${c.name}</span></button>`).join('');
 }
 
+
+/* ================= Icon tiles (единый стиль иконок) ================= */
+const TILE = {
+  pin: '<path d="M12 21.5s-7.2-6.1-7.2-11.7a7.2 7.2 0 0 1 14.4 0c0 5.6-7.2 11.7-7.2 11.7z" fill="#fff" stroke="none"/><circle cx="12" cy="9.8" r="2.7" fill="currentColor" stroke="none"/>',
+  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  info: '<circle cx="12" cy="12" r="9.5" fill="#fff" stroke="none"/><path d="M12 11v5.5" stroke="currentColor" stroke-width="2.6"/><circle cx="12" cy="7.6" r="1.5" fill="currentColor" stroke="none"/>',
+  moon: '<path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z" fill="#fff" stroke="none"/>',
+  heart: '<path d="M12 20.5s-8.2-5-9.9-10C.9 6.7 3.4 3.3 7.1 3.3c2.1 0 3.6 1.1 4.9 2.9 1.3-1.8 2.8-2.9 4.9-2.9 3.7 0 6.2 3.4 5 7.2-1.7 5-9.9 10-9.9 10z" fill="#fff" stroke="none"/>',
+  bag: '<path d="M5 8h14l-1.1 12.1a1.6 1.6 0 0 1-1.6 1.4H7.7a1.6 1.6 0 0 1-1.6-1.4z" fill="#fff" stroke="none"/><path d="M8.8 10.5V7a3.2 3.2 0 0 1 6.4 0v3.5" stroke="currentColor" stroke-width="2.2"/>',
+  receipt: '<path d="M5.5 2.8h13v18.6l-3.25-2.1-3.25 2.1-3.25-2.1-3.25 2.1z" fill="#fff" stroke="none"/><path d="M9 8.5h6M9 12.5h6" stroke="currentColor" stroke-width="2.2"/>',
+  search: '<circle cx="10.8" cy="10.8" r="6.5"/><path d="m20 20-4.4-4.4"/>'
+};
+const tile = (name, color, cls = '') => `<span class="tile tile--${color} ${cls}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${TILE[name]}</svg></span>`;
+
 /* ================= Account & sub screens ================= */
 const icoBack = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>';
 const icoChev = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>';
@@ -296,20 +311,31 @@ function addressText() {
   return a.street ? `${a.street}, ${a.house || ''}${a.apt ? ', кв. ' + a.apt : ''}` : 'Не указан';
 }
 function renderAccount() {
-  $('#page').innerHTML = `${backBar()}
-    <div class="acc">
+  $('#page').innerHTML = `
+    <div class="acc acc--top">
       <button class="acc__login" data-action="login">Войти или зарегистрироваться</button>
       <a class="acc__card acc__row" href="#/address">
-        <span class="acc__ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
+        ${tile('pin', 'blue', 'acc__tile')}
         <span class="acc__text"><small>Адрес доставки</small><b>${esc(addressText())}</b></span>${icoChev}
       </a>
       <div class="acc__card">
-        <a class="acc__row" href="#/favorites"><span class="acc__ico">${heart.replace('width="18" height="18"', 'width="26" height="26"')}</span><span class="acc__text"><b>Избранное</b></span>${icoChev}</a>
-        <a class="acc__row" href="#/orders"><span class="acc__ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="acc__text"><b>История заказов</b></span>${icoChev}</a>
-        <a class="acc__row" href="#/about"><span class="acc__ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span><span class="acc__text"><b>О сервисе</b></span>${icoChev}</a>
+        <a class="acc__row" href="#/settings">${tile('gear', 'slate', 'acc__tile')}<span class="acc__text"><b>Настройки</b></span>${icoChev}</a>
+        <a class="acc__row" href="#/about">${tile('info', 'violet', 'acc__tile')}<span class="acc__text"><b>О сервисе</b></span>${icoChev}</a>
       </div>
       <div class="acc__foot"><div class="acc__brand">Mayr<b>Market</b></div><div>Версия 1.0</div></div>
     </div>`;
+}
+function renderSettings() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  $('#page').innerHTML = `${backBar()}
+    <div class="acc">
+      <h1 class="acc__title">Настройки</h1>
+      <div class="acc__card">
+        <label class="acc__row acc__switchrow">${tile('moon', 'night', 'acc__tile')}<span class="acc__text"><b>Тёмная тема</b></span>
+          <input type="checkbox" class="switch" id="darkSwitch" ${dark ? 'checked' : ''}></label>
+      </div>
+    </div>`;
+  $('#darkSwitch').onchange = e => { state.theme = e.target.checked ? 'dark' : 'light'; LS.set('theme', state.theme); applyTheme(); };
 }
 function renderAddress() {
   const f = state.address || {};
@@ -365,7 +391,7 @@ function renderFavorites() {
   if (!items.length) {
     page.innerHTML = `
       <div class="toolbar"><h1 class="toolbar__title">Избранное</h1></div>
-      <div class="empty">${ic('whiteheart', 'empty__icon')}<div class="empty__title">В избранном пусто</div>Нажмите ♡ на карточке товара<br><a class="btn btn--primary btn--sm" href="#/">В каталог</a></div>`;
+      <div class="empty">${tile('heart', 'red', 'empty__tile')}<div class="empty__title">В избранном пусто</div>Нажмите на сердечко на карточке товара<br><a class="btn btn--primary btn--sm" href="#/">В каталог</a></div>`;
     return;
   }
   const list = sortList(items, state.favSort);
@@ -406,7 +432,7 @@ function renderOrders() {
   const page = $('#page');
   if (!state.orders.length) {
     page.innerHTML = `<div class="toolbar"><h1 class="toolbar__title">Мои заказы</h1></div>
-      <div class="empty">${ic('package', 'empty__icon')}<div class="empty__title">Заказов пока нет</div><a class="btn btn--primary btn--sm" href="#/">В каталог</a></div>`;
+      <div class="empty">${tile('receipt', 'orange', 'empty__tile')}<div class="empty__title">Заказов пока нет</div><a class="btn btn--primary btn--sm" href="#/">В каталог</a></div>`;
     return;
   }
   page.innerHTML = `<div class="toolbar"><h1 class="toolbar__title">Мои заказы <small>${state.orders.length}</small></h1></div>
@@ -516,7 +542,7 @@ function cartHTML(inDrawer) {
   const t = totals();
   const head = (extra = '') => `<div class="cart__head" ${inDrawer ? 'style="padding-right:62px"' : ''}><h2 class="cart__title">Корзина</h2>${extra}</div>`;
   if (!t.lines.length) {
-    return `<div class="cart">${head()}<div class="cart__body"><div class="cart__empty">${ic('basket', '')}<b>Корзина пуста</b></div></div></div>`;
+    return `<div class="cart">${head()}<div class="cart__body"><div class="cart__empty">${tile('bag', 'green', 'empty__tile')}<b>Корзина пуста</b></div></div></div>`;
   }
   const bad = t.lines.filter(l => !l.ok);
   return `<div class="cart">

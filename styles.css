@@ -758,3 +758,24 @@ body.sub .top { display: none; }
 }
 .acc__card.acc__row { flex-direction: row; }
 @media (max-width: 760px) { .acc__login { width: auto; padding: 0 30px; } }
+/* v4: единые иконки-плашки, настройки */
+.tile { display: grid; place-items: center; border-radius: 12px; flex-shrink: 0; color: var(--tile-c); background: linear-gradient(160deg, var(--tile-a), var(--tile-c)); box-shadow: 0 4px 10px -4px var(--tile-c), inset 0 1px 0 rgba(255,255,255,.25); }
+.tile svg { width: 60%; height: 60%; }
+.tile--blue { --tile-a: #3D7BFF; --tile-c: #0033B0; }
+.tile--slate { --tile-a: #8A93A6; --tile-c: #4B5468; }
+.tile--violet { --tile-a: #9B6BFF; --tile-c: #5B2FD6; }
+.tile--night { --tile-a: #3B4A8C; --tile-c: #141C46; }
+.tile--red { --tile-a: #FF5C7A; --tile-c: #E0193F; }
+.tile--orange { --tile-a: #FFAA3B; --tile-c: #F06A00; }
+.tile--green { --tile-a: #34D27B; --tile-c: #0E9F52; }
+.acc__tile { width: 40px; height: 40px; }
+.acc--top { padding-top: 28px; }
+.empty__tile { width: 92px; height: 92px; border-radius: 28px; margin: 0 auto 18px; }
+.empty__tile svg { width: 54%; height: 54%; }
+.cart__empty .empty__tile { margin-bottom: 14px; }
+.acc__switchrow { cursor: pointer; border-radius: 22px !important; }
+.switch { appearance: none; -webkit-appearance: none; width: 52px; height: 32px; border-radius: 16px; background: var(--surface-3); position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; margin: 0; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.25); transition: transform .2s; }
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(20px); }
+.tabbar svg, .round-btn svg, .cart-pill svg { stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
