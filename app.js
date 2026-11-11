@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794424415';
+const BUILD = '1794425019';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -141,15 +141,20 @@ function syncFav(id) {
 /* ================= Router ================= */
 function parseRoute() {
   const h = location.hash.replace(/^#\/?/, '');
-  state.route = h.startsWith('favorites') ? 'favorites' : h.startsWith('orders') ? 'orders' : 'catalog';
+  state.route = ['favorites', 'orders', 'account', 'address', 'about'].find(r => h.startsWith(r)) || 'catalog';
 }
 window.addEventListener('hashchange', () => { parseRoute(); closeAll(); renderPage(); window.scrollTo(0, 0); });
 
 function renderPage() {
-  $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === state.route));
+  const navOf = { address: 'account', about: 'account' };
+  $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (navOf[state.route] || state.route)));
+  document.body.classList.toggle('sub', state.route !== 'catalog');
   renderCats();
-  if (state.route === 'favorites') return renderFavorites();
-  if (state.route === 'orders') return renderOrders();
+  if (state.route === 'favorites') { renderFavorites(); return addBack(); }
+  if (state.route === 'orders') { renderOrders(); return addBack(); }
+  if (state.route === 'account') return renderAccount();
+  if (state.route === 'address') return renderAddress();
+  if (state.route === 'about') return renderAbout();
   renderCatalogPage();
 }
 
@@ -249,7 +254,7 @@ function renderCatalog() {
     RECS = [];
     for (let i = 0; i < 10 && pool.length; i++) RECS.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
   }
-  let html = `<section class="section"><div class="section__head"><h2 class="section__title">Рекомендации для вас</h2><button class="section__more" data-action="reshuffle">Обновить</button></div><div class="grid">${RECS.map(cardHTML).join('')}</div></section>`;
+  let html = `<section class="section"><div class="section__head"><h2 class="section__title">Рекомендации для вас</h2></div><div class="grid">${RECS.map(cardHTML).join('')}</div></section>`;
   CATEGORIES.forEach(c => {
     const items = list.filter(p => p.cat === c.id && p.img && stockOf(p) > 0).sort((a, b) => b.popularity - a.popularity);
     if (!items.length) return;
@@ -279,6 +284,79 @@ function renderCats() {
 function renderCatStrip() {
   const s = $('#catStrip');
   if (s) s.innerHTML = catItems().map(c => `<button class="circle ${state.cat === c.id ? 'active' : ''}" data-cat="${c.id}"><span class="circle__img" style="background:${c.color || 'var(--surface)'}">${ic(c.icon, '')}</span><span class="circle__name">${c.name}</span></button>`).join('');
+}
+
+/* ================= Account & sub screens ================= */
+const icoBack = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>';
+const icoChev = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>';
+const backBar = () => `<div class="subhead"><button class="subhead__back" data-action="back" aria-label="Назад">${icoBack}</button></div>`;
+function addBack() { $('#page').insertAdjacentHTML('afterbegin', backBar()); }
+function addressText() {
+  const a = state.address || {};
+  return a.street ? `${a.street}, ${a.house || ''}${a.apt ? ', кв. ' + a.apt : ''}` : 'Не указан';
+}
+function renderAccount() {
+  $('#page').innerHTML = `${backBar()}
+    <div class="acc">
+      <div class="acc__avatar"><svg viewBox="0 0 80 80" width="80" height="80"><circle cx="40" cy="30" r="15" fill="currentColor"/><path d="M12 72c3-15 15-23 28-23s25 8 28 23" fill="currentColor"/></svg></div>
+      <button class="acc__login" data-action="login">Войти или зарегистрироваться</button>
+      <a class="acc__card acc__row" href="#/address">
+        <span class="acc__ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
+        <span class="acc__text"><small>Адрес доставки</small><b>${esc(addressText())}</b></span>${icoChev}
+      </a>
+      <div class="acc__card">
+        <a class="acc__row" href="#/favorites"><span class="acc__ico">${heart.replace('width="18" height="18"', 'width="26" height="26"')}</span><span class="acc__text"><b>Избранное</b></span>${icoChev}</a>
+        <a class="acc__row" href="#/orders"><span class="acc__ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="acc__text"><b>История заказов</b></span>${icoChev}</a>
+        <a class="acc__row" href="#/about"><span class="acc__ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span><span class="acc__text"><b>О сервисе</b></span>${icoChev}</a>
+      </div>
+      <div class="acc__foot"><div class="acc__brand">Mayr<b>Market</b></div><div>Версия 1.0</div></div>
+    </div>`;
+}
+function renderAddress() {
+  const f = state.address || {};
+  $('#page').innerHTML = `${backBar()}
+    <div class="acc">
+      <h1 class="acc__title">Адрес доставки</h1>
+      <form class="acc__form" id="addrForm" novalidate>
+        <div class="field"><input name="street" placeholder=" " value="${esc(f.street || '')}"><label>Улица</label></div>
+        <div class="row row--3">
+          <div class="field"><input name="house" placeholder=" " value="${esc(f.house || '')}"><label>Дом</label></div>
+          <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Кв./офис</label></div>
+          <div class="field"><input name="entrance" placeholder=" " value="${esc(f.entrance || '')}"><label>Подъезд</label></div>
+        </div>
+        <div class="row row--2">
+          <div class="field"><input name="floor" placeholder=" " value="${esc(f.floor || '')}"><label>Этаж</label></div>
+          <div class="field"><input name="code" placeholder=" " value="${esc(f.code || '')}"><label>Домофон</label></div>
+        </div>
+        <button class="acc__login acc__save" type="submit">Сохранить</button>
+      </form>
+    </div>`;
+  $('#addrForm').onsubmit = e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.target));
+    if (!d.street.trim() || !d.house.trim()) { toast('Укажите улицу и дом'); return; }
+    state.address = { ...state.address, ...d };
+    LS.set('address', state.address);
+    renderPoint();
+    toast('Адрес сохранён');
+    history.length > 1 ? history.back() : (location.hash = '#/account');
+  };
+}
+function renderAbout() {
+  const pt = POINTS[0];
+  $('#page').innerHTML = `${backBar()}
+    <div class="acc">
+      <h1 class="acc__title">О сервисе</h1>
+      <div class="acc__card acc__about">
+        <p><b>MayrMarket</b> — доставка продуктов по Грозному из магазинов города. Цены и наличие — как в самих магазинах.</p>
+        <div class="acc__kv"><span>Магазины</span><b>${STORES.map(s => esc(s.name)).join(', ')}</b></div>
+        <div class="acc__kv"><span>Часы доставки</span><b>${hours(pt)}</b></div>
+        <div class="acc__kv"><span>Время доставки</span><b>${pt.eta}</b></div>
+        <div class="acc__kv"><span>Доставка</span><b>${rub(pt.deliveryFee)}, от ${rub(pt.freeFrom)} бесплатно</b></div>
+        <div class="acc__kv"><span>Товаров в каталоге</span><b>${PRODUCTS.length.toLocaleString('ru-RU')}</b></div>
+      </div>
+      <div class="acc__foot"><div class="acc__brand">Mayr<b>Market</b></div><div>Версия 1.0</div></div>
+    </div>`;
 }
 
 /* ================= Favorites page ================= */
@@ -843,7 +921,8 @@ document.addEventListener('click', e => {
   if ((x = el('[data-action]'))) {
     const a = x.dataset.action;
     if (a === 'open-points') openPoints();
-    if (a === 'reshuffle') { RECS = null; renderCatalog(); }
+    if (a === 'back') { history.length > 1 && document.referrer !== undefined ? history.back() : (location.hash = '#/'); }
+    if (a === 'login') toast('Вход появится, когда подключим сервер');
     if (a === 'more') { state.limit += 60; const y = window.scrollY; renderCatalog(); window.scrollTo(0, y); }
     if (a === 'open-cart') openCart();
     if (a === 'toggle-theme') { state.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; LS.set('theme', state.theme); applyTheme(); }
