@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const BUILD = '1794432923';
+const BUILD = '1794433782';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }

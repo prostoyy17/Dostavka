@@ -858,3 +858,30 @@ body.sub .top { display: none; }
 /* v11: тёмная тема — чёрная (вариант А) */
 :root[data-theme="dark"] .tabbar { box-shadow: none; border-top: 1px solid var(--line); }
 :root[data-theme="dark"] .dd__back { background: rgba(0,0,0,.6); }
+/* v12: плавающая нижняя панель-капсула (стекло) */
+@media (max-width: 760px) {
+  .tabbar, :root[data-theme="dark"] .tabbar {
+    left: 14px; right: 14px; bottom: calc(10px + env(safe-area-inset-bottom)); height: 66px; padding: 6px; gap: 4px;
+    border: 0; border-radius: 33px;
+    background: rgba(255, 255, 255, .72);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+    box-shadow: 0 10px 30px rgba(14, 20, 51, .14), inset 0 0 0 .5px rgba(255, 255, 255, .6);
+  }
+  :root[data-theme="dark"] .tabbar {
+    background: rgba(30, 30, 33, .72);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .5), inset 0 0 0 .5px rgba(255, 255, 255, .12);
+  }
+  .tabbar > * { border-radius: 27px; gap: 2px; font-size: 11px; transition: background .2s, color .2s; }
+  .tabbar > .active { background: var(--accent-soft); color: var(--accent); }
+  :root[data-theme="dark"] .tabbar > .active { background: rgba(77, 124, 255, .18); color: #7FA2FF; }
+  .tabbar .phi { width: 21px; height: 21px; }
+  .tabbar .badge { top: 4px; right: calc(50% - 22px); }
+  .layout { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+  .toasts { bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .cart-page .cart__foot { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .acc--top { min-height: calc(100dvh - 90px - env(safe-area-inset-bottom)); }
+}
+@media (max-width: 760px) {
+  .tabbar { background: rgba(255, 255, 255, .88) !important; }
+  :root[data-theme="dark"] .tabbar { background: rgba(28, 28, 31, .88) !important; }
+}
