@@ -912,3 +912,13 @@ body.sub .top { display: none; }
   .tabbar::before { background: #FFFFFF; }
   :root[data-theme="dark"] .tabbar::before { background: #1C1C1F; }
 }
+/* v15: фото товаров — светлая плитка во всю карточку и в тёмной теме (как в Лавке) */
+:root[data-theme="dark"] { --tile: #F2F1ED; }
+img.photo { mix-blend-mode: multiply; }
+:root[data-theme="dark"] .cart-item__img, :root[data-theme="dark"] .summary-item__img, :root[data-theme="dark"] .order__icons span, :root[data-theme="dark"] .pm__related .card__img { background: var(--tile) !important; }
+:root[data-theme="dark"] .card .fav-btn { color: #9A9AA0; }
+/* стекло без тени и без линии */
+@media (max-width: 760px) {
+  .tabbar::before { background: rgba(255, 255, 255, .72) !important; -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
+  :root[data-theme="dark"] .tabbar::before { background: rgba(30, 30, 33, .7) !important; }
+}
