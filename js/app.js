@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794489273';
+const BUILD = '1794491862';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -51,8 +51,11 @@ const stockOf = (p, pid = state.point || POINTS[0].id) => p ? (p.stock[pid] || 0
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const rubP = n => (Math.round(n * 100) / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '\u00a0₽';
 const pic = (p, cls = 'ic') => p.img ? `<img class="${cls} photo" src="${p.img}" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.className='${cls}';this.src='assets/icons/${p.icon}.webp'">` : ic(p.icon, cls);
-const isOpen = pt => { const h = new Date().getHours(); return h >= pt.hours[0] && h < pt.hours[1]; };
-const hours = pt => `${String(pt.hours[0]).padStart(2, '0')}:00–${pt.hours[1]}:00`;
+const pad2 = n => String(n % 24).padStart(2, '0');
+// hours: [открытие, закрытие]; закрытие больше 24 означает «после полуночи» (25 = 01:00 ночи)
+const isOpen = pt => { const h = new Date().getHours(), [a, b] = pt.hours; return (h >= a && h < b) || (b > 24 && h < b - 24); };
+const opensToday = pt => new Date().getHours() < pt.hours[0];
+const hours = pt => `${pad2(pt.hours[0])}:00–${pad2(pt.hours[1])}:00`;
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c; };
 const heart = svgI('heart-o', 20, 'h-off') + svgI('heart', 20, 'h-on');
 
@@ -453,7 +456,7 @@ function renderPoint() {
   const open = pt ? isOpen(pt) : false;
   $('#pointDot').classList.toggle('off', !open);
   $('#pointMeta').textContent = pt
-    ? (state.address.street ? `${state.address.street}, ${state.address.house || ''}` : (open ? `Сегодня до ${pt.hours[1]}:00 · ${pt.eta}` : `Завтра с ${String(pt.hours[0]).padStart(2, '0')}:00`))
+    ? (state.address.street ? `${state.address.street}, ${state.address.house || ''}` : (open ? `Сегодня до ${pad2(pt.hours[1])}:00 · ${pt.eta}` : `${opensToday(pt) ? 'Сегодня' : 'Завтра'} с ${pad2(pt.hours[0])}:00`))
     : 'Грозный';
 }
 
@@ -610,7 +613,8 @@ function timeSlots() {
     for (let h = pt.hours[0]; h < pt.hours[1] && slots.length < 15; h++) {
       const start = new Date(now); start.setDate(now.getDate() + d); start.setHours(h, 0, 0, 0);
       if (start - now < 60 * 60 * 1000) continue;
-      slots.push({ id: start.toISOString(), title: `${h}:00–${h + 1}:00`, sub: d === 0 ? 'Сегодня' : 'Завтра' });
+      const day = Math.round((new Date(start).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 864e5);
+      slots.push({ id: start.toISOString(), title: `${pad2(h)}:00–${pad2(h + 1)}:00`, sub: ['Сегодня', 'Завтра', 'Послезавтра'][day] || start.toLocaleDateString('ru-RU') });
     }
   }
   return slots;

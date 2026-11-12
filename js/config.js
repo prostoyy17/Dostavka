@@ -1,4 +1,4 @@
-// Настройки доставки и склады. Каталог товаров — в data/catalog.js.
+// Настройки доставки и склады. hours: [открытие, закрытие], 25 = 01:00 ночи. Каталог товаров — в data/catalog.js.
 // Выбор складов в шапке. Пока складов нет — false (в шапке «Доставка по Грозному»).
 const WAREHOUSES_ENABLED = false;
 // Параметры доставки задаёт владелец сервиса. minOrder: 0 — без минимальной суммы заказа.
@@ -6,7 +6,7 @@ const STORES = window.CATALOG.meta.stores;
 const POINTS = [
   {
     id: 'grz', city: 'Грозный', store: STORES.map(s => s.name).join(', '), address: 'Грозный',
-    hours: [9, 21], eta: '60–90 мин', minOrder: 0, deliveryFee: 200, freeFrom: 3000,
+    hours: [9, 25], eta: '60–90 мин', minOrder: 0, deliveryFee: 200, freeFrom: 3000,
     phone: '', x: 262, y: 118,
     zones: ['Ахматовский', 'Байсангуровский', 'Висаитовский', 'Шейх-Мансуровский']
   }
