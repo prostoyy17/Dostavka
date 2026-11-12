@@ -787,3 +787,14 @@ img.photo { mix-blend-mode: multiply; }
 .acc__me em { font-style: normal; font-size: 14px; color: var(--text-3); }
 .acc__logout { width: 100%; text-align: left; color: var(--danger); }
 .acc__logout .pico, .acc__logout .acc__text b { color: var(--danger); }
+
+/* переключатель «Войти / Зарегистрироваться» с плавной плашкой */
+.auth__tabs { position: relative; }
+.auth__tabs::before { content: ""; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 16px; background: var(--accent);
+  transition: transform .32s cubic-bezier(.3, .8, .25, 1); }
+.auth__tabs[data-tab="register"]::before { transform: translateX(100%); }
+.auth__tabs button { position: relative; z-index: 1; transition: color .25s; }
+.auth__tabs button.on { background: none; color: #fff; }
+.auth__form { animation: authIn .3s ease both; transition: opacity .18s, transform .18s; }
+.auth__form--out { opacity: 0; transform: translateY(6px); }
+@keyframes authIn { from { opacity: 0; transform: translateY(8px); } }

@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794505324';
+const BUILD = '1794523241';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -411,9 +411,9 @@ function renderAuth() {
   const pass = (id, ph) => `<div class="auth__field auth__field--pass"><input id="${id}" type="password" placeholder="${ph}" autocomplete="${tab === 'login' ? 'current-password' : 'new-password'}"><button type="button" class="auth__eye" data-eye="${id}" aria-label="Показать пароль">${svgI('eye', 22)}</button></div>`;
   $('#page').innerHTML = `
     <div class="auth">
-      <div class="auth__tabs">
-        <button class="${tab === 'login' ? 'on' : ''}" data-auth-tab="login">${svgI('signin', 20)}Войти</button>
-        <button class="${tab === 'register' ? 'on' : ''}" data-auth-tab="register">${svgI('userplus', 20)}Зарегистрироваться</button>
+      <div class="auth__tabs" data-tab="${tab}">
+        <button class="${tab === 'login' ? 'on' : ''}" data-auth-tab="login">Войти</button>
+        <button class="${tab === 'register' ? 'on' : ''}" data-auth-tab="register">Зарегистрироваться</button>
       </div>
       ${tab === 'login' ? `
       <form class="auth__form" id="authForm" novalidate>
@@ -427,7 +427,7 @@ function renderAuth() {
         <h1 class="auth__title">Создать аккаунт</h1>
         <div class="auth__field"><input id="aPhone" type="tel" placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" value="${esc(fmtDigits(draft.phone || ''))}"></div>
         <div class="auth__field"><input id="aEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email" value="${esc(draft.email || '')}"></div>
-        ${pass('aPass', 'Пароль (минимум 6 символов)')}
+        ${pass('aPass', 'Пароль (минимум 3 символа)')}
         <div class="auth__hint">Укажите телефон, почту или и то и другое</div>
         <div class="auth__err" id="authErr"></div>
         <button class="auth__submit" type="submit">Создать аккаунт</button>
@@ -443,7 +443,15 @@ function renderAuth() {
   };
   const err = m => { $('#authErr').textContent = m || ''; };
   const page = $('#page');
-  page.querySelectorAll('[data-auth-tab]').forEach(b => b.onclick = () => { saveDraft(); const d = LS.get('authDraft', {}); d.tab = b.dataset.authTab; LS.set('authDraft', d); renderAuth(); addGap(); });
+  page.querySelectorAll('[data-auth-tab]').forEach(b => b.onclick = () => {
+    const to = b.dataset.authTab; if (to === tab) return;
+    saveDraft(); const d = LS.get('authDraft', {}); d.tab = to; LS.set('authDraft', d);
+    // сначала плашка плавно переезжает, потом меняется форма
+    const tabs = page.querySelector('.auth__tabs'); tabs.dataset.tab = to;
+    tabs.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    page.querySelector('.auth__form').classList.add('auth__form--out');
+    setTimeout(() => { renderAuth(); addGap(); }, 180);
+  });
   page.querySelectorAll('[data-eye]').forEach(b => b.onclick = () => {
     const i = $('#' + b.dataset.eye), show = i.type === 'password';
     i.type = show ? 'text' : 'password'; b.innerHTML = svgI(show ? 'eyeoff' : 'eye', 22);
@@ -487,7 +495,7 @@ function renderAuth() {
       if (!ph && !em) return bad('aPhone', 'Укажите телефон или почту');
       if (ph && ph.length !== 10) return bad('aPhone', 'Номер телефона введён не полностью');
       if (em && !validEmail(em)) return bad('aEmail', 'Проверьте почту — например, name@mail.ru');
-      if (pw.length < 6) return bad('aPass', 'Пароль — минимум 6 символов');
+      if (pw.length < 3) return bad('aPass', 'Пароль — минимум 3 символа');
       if (ph && accounts.some(a => a.phone === ph)) return bad('aPhone', 'Этот номер уже зарегистрирован — войдите');
       if (em && accounts.some(a => a.email === em)) return bad('aEmail', 'Эта почта уже зарегистрирована — войдите');
       accounts.push({ phone: ph, email: em, hash: await sha256(pw) }); LS.set('accounts', accounts);
