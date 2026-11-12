@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794494017';
+const BUILD = '1794505324';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -21,6 +21,7 @@ const state = {
   favs: LS.get('favs', []),              // ordered list, newest first
   orders: LS.get('orders', []),
   address: LS.get('address', {}),
+  user: LS.get('user', null),
   theme: LS.get('theme', null),
   route: 'catalog',
   cat: 'all',
@@ -146,12 +147,12 @@ function syncFav(id) {
 /* ================= Router ================= */
 function parseRoute() {
   const h = location.hash.replace(/^#\/?/, '');
-  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart'].find(r => h.startsWith(r)) || 'catalog';
+  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart', 'login'].find(r => h.startsWith(r)) || 'catalog';
 }
 window.addEventListener('hashchange', () => { parseRoute(); closeAll(); renderPage(); window.scrollTo(0, 0); });
 
 function renderPage() {
-  const navOf = { address: 'account', about: 'account', settings: 'account', orders: 'account' };
+  const navOf = { address: 'account', about: 'account', settings: 'account', orders: 'account', login: 'account' };
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (navOf[state.route] || state.route)));
   document.body.classList.toggle('sub', state.route !== 'catalog');
   renderCats();
@@ -162,6 +163,7 @@ function renderPage() {
   if (state.route === 'address') return renderAddress();
   if (state.route === 'about') return renderAbout();
   if (state.route === 'settings') return renderSettings();
+  if (state.route === 'login') { renderAuth(); return addGap(); }
   renderCatalogPage();
 }
 
@@ -303,7 +305,8 @@ function addressText() {
 function renderAccount() {
   $('#page').innerHTML = `
     <div class="acc acc--top">
-      <button class="acc__login" data-action="login">Войти или зарегистрироваться</button>
+      ${state.user ? `<div class="acc__card acc__row acc__me">${iconBox('user', 'acc__tile')}<span class="acc__text"><small>Аккаунт</small><b>${esc(state.user.phone || state.user.email)}</b>${state.user.phone && state.user.email ? `<em>${esc(state.user.email)}</em>` : ''}</span></div>`
+        : `<button class="acc__login" data-action="login">Войти или зарегистрироваться</button>`}
       <a class="acc__card acc__row" href="#/address">
         ${iconBox('pin', 'acc__tile')}
         <span class="acc__text"><small>Адрес доставки</small><b>${esc(addressText())}</b></span>${icoChev}
@@ -313,6 +316,7 @@ function renderAccount() {
         <a class="acc__row" href="#/settings">${iconBox('gear', 'acc__tile')}<span class="acc__text"><b>Настройки</b></span>${icoChev}</a>
         <a class="acc__row" href="#/about">${iconBox('info', 'acc__tile')}<span class="acc__text"><b>О сервисе</b></span>${icoChev}</a>
       </div>
+      ${state.user ? `<div class="acc__card"><button class="acc__row acc__logout" data-action="logout">${iconBox('signout', 'acc__tile')}<span class="acc__text"><b>Выйти из аккаунта</b></span></button></div>` : ''}
       <div class="acc__foot"><div class="acc__brand">Mayr<b>Market</b></div><div>Версия 1.0</div></div>
     </div>`;
 }
@@ -374,6 +378,125 @@ function renderAbout() {
       <div class="acc__credit">Иконки: <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener">Uicons by Flaticon</a></div>
       <div class="acc__foot"><div class="acc__brand">Mayr<b>Market</b></div><div>Версия 1.0</div></div>
     </div>`;
+}
+
+
+/* ================= Вход и регистрация =================
+   Пока нет сервера, аккаунт хранится только в этом браузере (пароль — в виде SHA-256 хеша).
+   Черновик формы (вкладка, телефон, почта) сохраняется, чтобы не терялся при обновлении страницы. Пароль не сохраняется. */
+// цифры номера без кода страны: «+7 …», «8 …» и «7 …» в начале — это код, а не часть номера
+const phoneDigits = v => {
+  let t = String(v).trim(), d;
+  if (t.startsWith('+7')) d = t.slice(2).replace(/\D/g, '');
+  else { d = t.replace(/\D/g, ''); if (/^[78]/.test(d)) d = d.slice(1); }
+  return d.slice(0, 10);
+};
+const formatPhone = v => fmtDigits(phoneDigits(v));
+const fmtDigits = d => {
+  if (!d) return '';
+  let out = '+7 (' + d.slice(0, 3);
+  if (d.length >= 3) out += ') ' + d.slice(3, 6);
+  if (d.length >= 6) out += '-' + d.slice(6, 8);
+  if (d.length >= 8) out += '-' + d.slice(8, 10);
+  return out;
+};
+const looksLikePhone = v => /^[\s+()\-\d]+$/.test(v) && /\d/.test(v);
+const validEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
+const sha256 = async t => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('mayr:' + t)))].map(b => b.toString(16).padStart(2, '0')).join('');
+
+function renderAuth() {
+  if (state.user) { location.hash = '#/account'; return; }
+  const draft = LS.get('authDraft', { tab: 'login', login: '', phone: '', email: '' });
+  const tab = draft.tab === 'register' ? 'register' : 'login';
+  const pass = (id, ph) => `<div class="auth__field auth__field--pass"><input id="${id}" type="password" placeholder="${ph}" autocomplete="${tab === 'login' ? 'current-password' : 'new-password'}"><button type="button" class="auth__eye" data-eye="${id}" aria-label="Показать пароль">${svgI('eye', 22)}</button></div>`;
+  $('#page').innerHTML = `
+    <div class="auth">
+      <div class="auth__tabs">
+        <button class="${tab === 'login' ? 'on' : ''}" data-auth-tab="login">${svgI('signin', 20)}Войти</button>
+        <button class="${tab === 'register' ? 'on' : ''}" data-auth-tab="register">${svgI('userplus', 20)}Зарегистрироваться</button>
+      </div>
+      ${tab === 'login' ? `
+      <form class="auth__form" id="authForm" novalidate>
+        <h1 class="auth__title">Вход в аккаунт</h1>
+        <div class="auth__field"><input id="aLogin" placeholder="Телефон или почта" autocomplete="username" inputmode="email" value="${esc(draft.login || '')}"></div>
+        ${pass('aPass', 'Пароль')}
+        <div class="auth__err" id="authErr"></div>
+        <button class="auth__submit" type="submit">Войти</button>
+      </form>` : `
+      <form class="auth__form" id="authForm" novalidate>
+        <h1 class="auth__title">Создать аккаунт</h1>
+        <div class="auth__field"><input id="aPhone" type="tel" placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" value="${esc(fmtDigits(draft.phone || ''))}"></div>
+        <div class="auth__field"><input id="aEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email" value="${esc(draft.email || '')}"></div>
+        ${pass('aPass', 'Пароль (минимум 6 символов)')}
+        <div class="auth__hint">Укажите телефон, почту или и то и другое</div>
+        <div class="auth__err" id="authErr"></div>
+        <button class="auth__submit" type="submit">Создать аккаунт</button>
+      </form>`}
+    </div>`;
+
+  const saveDraft = () => {
+    const d = LS.get('authDraft', {}); d.tab = tab;
+    if ($('#aLogin')) d.login = $('#aLogin').value;
+    if ($('#aPhone')) d.phone = phoneDigits($('#aPhone').value);
+    if ($('#aEmail')) d.email = $('#aEmail').value;
+    LS.set('authDraft', d);
+  };
+  const err = m => { $('#authErr').textContent = m || ''; };
+  const page = $('#page');
+  page.querySelectorAll('[data-auth-tab]').forEach(b => b.onclick = () => { saveDraft(); const d = LS.get('authDraft', {}); d.tab = b.dataset.authTab; LS.set('authDraft', d); renderAuth(); addGap(); });
+  page.querySelectorAll('[data-eye]').forEach(b => b.onclick = () => {
+    const i = $('#' + b.dataset.eye), show = i.type === 'password';
+    i.type = show ? 'text' : 'password'; b.innerHTML = svgI(show ? 'eyeoff' : 'eye', 22);
+  });
+  // маска телефона: +7 (XXX) XXX-XX-XX; в поле «Телефон или почта» — только если вводят цифры
+  const mask = (inp, always) => {
+    if (!inp) return;
+    let prev = phoneDigits(inp.value);
+    inp.addEventListener('input', e => {
+      if (always || looksLikePhone(inp.value)) {
+        let d = phoneDigits(inp.value);
+        if (/^delete/.test(e.inputType || '') && d === prev) d = d.slice(0, -1);   // стёрли скобку или чёрточку — стираем и цифру
+        if (!prev && d === '7' && !/^delete/.test(e.inputType || '')) d = '';   // «+7» набрали вручную после автоподстановки «+7 (»
+        const prefixOnly = !d && /^\s*(\+7?|[78])\s*\(?\s*$/.test(inp.value) && !/^delete/.test(e.inputType || '');
+        inp.value = d ? fmtDigits(d) : (prefixOnly ? '+7 (' : '');
+        prev = d;
+      }
+      err(''); inp.parentElement.classList.remove('bad'); saveDraft();
+    });
+  };
+  mask($('#aPhone'), true); mask($('#aLogin'), false);
+  [$('#aEmail'), $('#aPass')].forEach(i => i && i.addEventListener('input', () => { err(''); i.parentElement.classList.remove('bad'); saveDraft(); }));
+  const bad = (id, m) => { $('#' + id).parentElement.classList.add('bad'); err(m); $('#' + id).focus(); };
+
+  $('#authForm').onsubmit = async e => {
+    e.preventDefault();
+    const accounts = LS.get('accounts', []);
+    const pw = $('#aPass').value;
+    if (tab === 'login') {
+      const v = $('#aLogin').value.trim();
+      if (!v) return bad('aLogin', 'Введите телефон или почту');
+      const byPhone = looksLikePhone(v);
+      if (byPhone && phoneDigits(v).length !== 10) return bad('aLogin', 'Номер телефона введён не полностью');
+      if (!byPhone && !validEmail(v)) return bad('aLogin', 'Проверьте почту — например, name@mail.ru');
+      if (!pw) return bad('aPass', 'Введите пароль');
+      const acc = accounts.find(a => byPhone ? a.phone === phoneDigits(v) : a.email === v.toLowerCase());
+      if (!acc || acc.hash !== await sha256(pw)) return bad('aPass', 'Неверный логин или пароль');
+      state.user = { phone: acc.phone ? fmtDigits(acc.phone) : '', email: acc.email || '' };
+    } else {
+      const ph = phoneDigits($('#aPhone').value), em = $('#aEmail').value.trim().toLowerCase();
+      if (!ph && !em) return bad('aPhone', 'Укажите телефон или почту');
+      if (ph && ph.length !== 10) return bad('aPhone', 'Номер телефона введён не полностью');
+      if (em && !validEmail(em)) return bad('aEmail', 'Проверьте почту — например, name@mail.ru');
+      if (pw.length < 6) return bad('aPass', 'Пароль — минимум 6 символов');
+      if (ph && accounts.some(a => a.phone === ph)) return bad('aPhone', 'Этот номер уже зарегистрирован — войдите');
+      if (em && accounts.some(a => a.email === em)) return bad('aEmail', 'Эта почта уже зарегистрирована — войдите');
+      accounts.push({ phone: ph, email: em, hash: await sha256(pw) }); LS.set('accounts', accounts);
+      state.user = { phone: ph ? fmtDigits(ph) : '', email: em };
+    }
+    LS.set('user', state.user); LS.set('authDraft', { tab: 'login', login: '', phone: '', email: '' });
+    toast(tab === 'login' ? 'Вы вошли в аккаунт' : 'Аккаунт создан');
+    location.hash = '#/account';
+  };
 }
 
 /* ================= Favorites page ================= */
@@ -939,7 +1062,8 @@ document.addEventListener('click', e => {
     const a = x.dataset.action;
     if (a === 'open-points') openPoints();
     if (a === 'back') { history.length > 1 && document.referrer !== undefined ? history.back() : (location.hash = '#/'); }
-    if (a === 'login') toast('Вход появится, когда подключим сервер');
+    if (a === 'login') location.hash = '#/login';
+    if (a === 'logout') { state.user = null; LS.set('user', null); renderPage(); toast('Вы вышли из аккаунта'); }
     if (a === 'more') { state.limit += 60; const y = window.scrollY; renderCatalog(); window.scrollTo(0, y); }
     if (a === 'open-cart') openCart();
     if (a === 'clear-cart') {
