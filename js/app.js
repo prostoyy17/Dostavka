@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794554534';
+const BUILD = '1794555668';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -981,12 +981,15 @@ function unlockScroll(why) {
   document.body.classList.remove('locked');
   window.scrollTo(0, lockedY);
 }
-function showOverlay() { $('#overlay').classList.add('show'); lockScroll('overlay'); }
+// цвет строки состояния Safari под затемнением, чтобы сверху не было резкой тёмной полосы
+const setThemeColor = dim => { const m = document.querySelector('meta[name=theme-color]'); if (!m) return; const dark = document.documentElement.dataset.theme === 'dark'; m.content = dim ? (dark ? '#000000' : '#7C7E7A') : (dark ? '#000000' : '#EEEDE8'); };
+function showOverlay() { $('#overlay').classList.add('show'); lockScroll('overlay'); setThemeColor(true); }
 function closeAll() {
   $('#modal').classList.remove('show');
   $('#modal').onclick = null;
   $('#overlay').classList.remove('show');
   unlockScroll('overlay');
+  setThemeColor(false);
   clearInterval(trackTimer);
 }
 function openCart() {

@@ -798,3 +798,8 @@ img.photo { mix-blend-mode: multiply; }
 .auth__form { animation: authIn .3s ease both; transition: opacity .18s, transform .18s; }
 .auth__form--out { opacity: 0; transform: translateY(6px); }
 @keyframes authIn { from { opacity: 0; transform: translateY(8px); } }
+/* шторка товара на телефоне: прямые нижние углы и заливка до самого низа (без просветов у панели Safari) */
+html { background: var(--bg); }
+@media (max-width: 760px) {
+  .modal, .modal.show { border-radius: 28px 28px 0 0; box-shadow: 0 400px 0 0 var(--surface); padding-bottom: env(safe-area-inset-bottom); }
+}
