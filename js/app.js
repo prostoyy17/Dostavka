@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794523241';
+const BUILD = '1794553956';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -305,7 +305,7 @@ function addressText() {
 function renderAccount() {
   $('#page').innerHTML = `
     <div class="acc acc--top">
-      ${state.user ? `<div class="acc__card acc__row acc__me">${iconBox('user', 'acc__tile')}<span class="acc__text"><small>Аккаунт</small><b>${esc(state.user.phone || state.user.email)}</b>${state.user.phone && state.user.email ? `<em>${esc(state.user.email)}</em>` : ''}</span></div>`
+      ${state.user ? `<div class="acc__card acc__row acc__me">${iconBox('user', 'acc__tile')}<span class="acc__text"><small>Аккаунт</small><b>${esc(state.user.name || state.user.phone || state.user.email)}</b>${[state.user.name && state.user.phone, state.user.name || state.user.phone ? state.user.email : ''].filter(Boolean).map(x => `<em>${esc(x)}</em>`).join('')}</span></div>`
         : `<button class="acc__login" data-action="login">Войти или зарегистрироваться</button>`}
       <a class="acc__card acc__row" href="#/address">
         ${iconBox('pin', 'acc__tile')}
@@ -425,6 +425,7 @@ function renderAuth() {
       </form>` : `
       <form class="auth__form" id="authForm" novalidate>
         <h1 class="auth__title">Создать аккаунт</h1>
+        <div class="auth__field"><input id="aName" placeholder="Имя" autocomplete="given-name" autocapitalize="words" maxlength="40" value="${esc(draft.name || '')}"></div>
         <div class="auth__field"><input id="aPhone" type="tel" placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" value="${esc(fmtDigits(draft.phone || ''))}"></div>
         <div class="auth__field"><input id="aEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email" value="${esc(draft.email || '')}"></div>
         ${pass('aPass', 'Пароль (минимум 3 символа)')}
@@ -439,6 +440,7 @@ function renderAuth() {
     if ($('#aLogin')) d.login = $('#aLogin').value;
     if ($('#aPhone')) d.phone = phoneDigits($('#aPhone').value);
     if ($('#aEmail')) d.email = $('#aEmail').value;
+    if ($('#aName')) d.name = $('#aName').value;
     LS.set('authDraft', d);
   };
   const err = m => { $('#authErr').textContent = m || ''; };
@@ -473,7 +475,7 @@ function renderAuth() {
     });
   };
   mask($('#aPhone'), true); mask($('#aLogin'), false);
-  [$('#aEmail'), $('#aPass')].forEach(i => i && i.addEventListener('input', () => { err(''); i.parentElement.classList.remove('bad'); saveDraft(); }));
+  [$('#aName'), $('#aEmail'), $('#aPass')].forEach(i => i && i.addEventListener('input', () => { err(''); i.parentElement.classList.remove('bad'); saveDraft(); }));
   const bad = (id, m) => { $('#' + id).parentElement.classList.add('bad'); err(m); $('#' + id).focus(); };
 
   $('#authForm').onsubmit = async e => {
@@ -489,8 +491,10 @@ function renderAuth() {
       if (!pw) return bad('aPass', 'Введите пароль');
       const acc = accounts.find(a => byPhone ? a.phone === phoneDigits(v) : a.email === v.toLowerCase());
       if (!acc || acc.hash !== await sha256(pw)) return bad('aPass', 'Неверный логин или пароль');
-      state.user = { phone: acc.phone ? fmtDigits(acc.phone) : '', email: acc.email || '' };
+      state.user = { name: acc.name || '', phone: acc.phone ? fmtDigits(acc.phone) : '', email: acc.email || '' };
     } else {
+      const nm = $('#aName').value.trim().replace(/\s+/g, ' ');
+      if (!nm) return bad('aName', 'Введите имя');
       const ph = phoneDigits($('#aPhone').value), em = $('#aEmail').value.trim().toLowerCase();
       if (!ph && !em) return bad('aPhone', 'Укажите телефон или почту');
       if (ph && ph.length !== 10) return bad('aPhone', 'Номер телефона введён не полностью');
@@ -498,10 +502,10 @@ function renderAuth() {
       if (pw.length < 3) return bad('aPass', 'Пароль — минимум 3 символа');
       if (ph && accounts.some(a => a.phone === ph)) return bad('aPhone', 'Этот номер уже зарегистрирован — войдите');
       if (em && accounts.some(a => a.email === em)) return bad('aEmail', 'Эта почта уже зарегистрирована — войдите');
-      accounts.push({ phone: ph, email: em, hash: await sha256(pw) }); LS.set('accounts', accounts);
-      state.user = { phone: ph ? fmtDigits(ph) : '', email: em };
+      accounts.push({ name: nm, phone: ph, email: em, hash: await sha256(pw) }); LS.set('accounts', accounts);
+      state.user = { name: nm, phone: ph ? fmtDigits(ph) : '', email: em };
     }
-    LS.set('user', state.user); LS.set('authDraft', { tab: 'login', login: '', phone: '', email: '' });
+    LS.set('user', state.user); LS.set('authDraft', { tab: 'login', login: '', phone: '', email: '', name: '' });
     toast(tab === 'login' ? 'Вы вошли в аккаунт' : 'Аккаунт создан');
     location.hash = '#/account';
   };
