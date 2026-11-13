@@ -803,3 +803,8 @@ html { background: var(--bg); }
 @media (max-width: 760px) {
   .modal, .modal.show { border-radius: 28px 28px 0 0; box-shadow: 0 400px 0 0 var(--surface); padding-bottom: env(safe-area-inset-bottom); }
 }
+/* Safari красит строку состояния в цвет фиксированных слоёв сверху, даже прозрачных.
+   Поэтому скрытое затемнение и скрытое окно не имеют цвета и не видны вовсе. */
+.overlay { background: transparent; visibility: hidden; transition: background-color .2s, visibility 0s .2s; opacity: 1; }
+.overlay.show { background: rgba(10, 15, 12, .5); visibility: visible; transition: background-color .2s; }
+.modal:not(.show) { visibility: hidden; }
