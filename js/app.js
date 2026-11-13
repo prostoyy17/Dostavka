@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794564885';
+const BUILD = '1794571973';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -89,15 +89,19 @@ function totals() {
 }
 
 /* Весовые товары: шаг 0,5 кг, первое нажатие «+» — 1 кг */
-const KG_STEP = 0.5;
-const stepOf = p => p && p.kg ? KG_STEP : 1;
-// сколько можно взять: для весовых — остаток, округлённый вниз до 0,5 кг
-const maxOf = p => { const s = stockOf(p); return p && p.kg ? Math.floor(s / KG_STEP + 1e-9) * KG_STEP : s; };
+/* Весовые товары: вес выбирается с точностью 100 г (ползунок в окне товара),
+   кнопки «+» и «−» меняют вес на 0,5 кг. */
+const KG_STEP = 0.1;      // точность веса
+const KG_BTN = 0.5;       // шаг кнопок «+» / «−»
+const KG_MAX = 10;        // больше 10 кг одного товара на ползунке не предлагаем
+const stepOf = p => p && p.kg ? KG_BTN : 1;
+// сколько можно взять: для весовых — остаток, округлённый вниз до 100 г
+const maxOf = p => { const s = stockOf(p); return p && p.kg ? Math.round(Math.floor(s / KG_STEP + 1e-9) * KG_STEP * 10) / 10 : s; };
 // первое нажатие «+»: 1 кг (или сколько есть, если меньше), штучные — 1 шт
 const firstOf = p => p && p.kg ? Math.min(1, maxOf(p)) : 1;
 const fmtQty = (p, q) => p && p.kg ? `${String(Math.round(q * 10) / 10).replace('.', ',')} кг` : `${q} шт`;
-const stepQty = (p, q) => p && p.kg ? Math.round(q / KG_STEP) * KG_STEP : Math.round(q);
-const WEIGHT_NOTE = 'Весовые товары взвешивают в магазине: вес и сумма могут немного отличаться. Точную сумму курьер назовёт при доставке.';
+const stepQty = (p, q) => p && p.kg ? Math.round(Math.round(q / KG_STEP) * KG_STEP * 10) / 10 : Math.round(q);
+const WEIGHT_NOTE = 'Весовые товары взвешивают в магазине, поэтому вес и сумма могут немного отличаться.';
 function setQty(id, qty) {
   const p = byId[id];
   const max = maxOf(p);
@@ -117,14 +121,14 @@ function actionHTML(p, size = '') {
   if (size.includes('round')) {
     if (s === 0) return '';
     if (!q) return `<button class="add-btn add-btn--round" data-add="${p.id}" aria-label="В корзину">${svgI('plus', 20)}</button>`;
-    return `<div class="stepper stepper--round"><button data-dec="${p.id}" aria-label="Меньше">${svgI('minus', 16)}</button><span>${p.kg ? fmtQty(p, q) : q}</span><button data-inc="${p.id}" aria-label="Больше" ${q + stepOf(p) > maxOf(p) ? 'disabled' : ''}>${svgI('plus', 16)}</button></div>`;
+    return `<div class="stepper stepper--round"><button data-dec="${p.id}" aria-label="Меньше">${svgI('minus', 16)}</button><span>${p.kg ? fmtQty(p, q) : q}</span><button data-inc="${p.id}" aria-label="Больше" ${q >= maxOf(p) ? 'disabled' : ''}>${svgI('plus', 16)}</button></div>`;
   }
   if (s === 0) return `<button class="add-btn" disabled>Нет в наличии</button>`;
   if (!q) return `<button class="add-btn ${size.includes('primary') ? 'add-btn--primary' : ''}" data-add="${p.id}">+ В корзину</button>`;
   return `<div class="stepper ${size}">
     <button data-dec="${p.id}" aria-label="Меньше">${svgI('minus', 16)}</button>
     <span>${p.kg ? fmtQty(p, q) : q}</span>
-    <button data-inc="${p.id}" aria-label="Больше" ${q + stepOf(p) > maxOf(p) ? 'disabled' : ''}>${svgI('plus', 16)}</button>
+    <button data-inc="${p.id}" aria-label="Больше" ${q >= maxOf(p) ? 'disabled' : ''}>${svgI('plus', 16)}</button>
   </div>`;
 }
 function tagsHTML(p) {
@@ -147,12 +151,29 @@ function cardHTML(p) {
   </article>`;
 }
 function kgPickHTML(p) {
-  const q = state.cart[p.id] || 0;
-  const opts = [0.5, 1, 1.5, 2].filter(v => v <= maxOf(p));
-  return `<div class="kgpick__opts">${opts.map(v => `<button class="${q === v ? 'on' : ''}" data-kg="${p.id}:${v}">${fmtQty(p, v)}</button>`).join('')}</div>
-    <div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>≈ ${rubP(Math.round(p.price * q))}</b>` : `Выберите вес · ${rubP(p.price)} за 1 кг`}</div>
+  const q = state.cart[p.id] || 0, max = Math.min(maxOf(p), KG_MAX);
+  const v = q || Math.min(1, max);
+  const opts = [0.5, 1, 1.5, 2].filter(x => x <= max);
+  const pct = max > KG_STEP ? ((v - KG_STEP) / (max - KG_STEP)) * 100 : 100;
+  return `<div class="kgpick__head"><span class="kgpick__w" data-kgw>${fmtQty(p, v)}</span><span class="kgpick__p" data-kgp>≈ ${rubP(Math.round(p.price * v))}</span></div>
+    <input class="kgpick__range" type="range" min="${KG_STEP}" max="${max}" step="${KG_STEP}" value="${v}" data-kgrange="${p.id}" style="--pct:${pct}%" aria-label="Вес">
+    <div class="kgpick__opts">${opts.map(x => `<button class="${q === x ? 'on' : ''}" data-kg="${p.id}:${x}">${fmtQty(p, x)}</button>`).join('')}</div>
+    <div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)}` : `Выберите вес · ${rubP(p.price)} за 1 кг`}</div>
     <div class="kgpick__note">${WEIGHT_NOTE}</div>`;
 }
+// ползунок веса: пока тянут — меняем только подписи, отпустили — кладём в корзину
+document.addEventListener('input', e => {
+  const r = e.target.closest && e.target.closest('[data-kgrange]'); if (!r) return;
+  const p = byId[r.dataset.kgrange], v = stepQty(p, +r.value), box = r.closest('.kgpick');
+  const max = +r.max, min = +r.min;
+  r.style.setProperty('--pct', (max > min ? (v - min) / (max - min) * 100 : 100) + '%');
+  box.querySelector('[data-kgw]').textContent = fmtQty(p, v);
+  box.querySelector('[data-kgp]').textContent = '≈ ' + rubP(Math.round(p.price * v));
+});
+document.addEventListener('change', e => {
+  const r = e.target.closest && e.target.closest('[data-kgrange]'); if (!r) return;
+  setQty(r.dataset.kgrange, +r.value);
+});
 function refreshQty(id) {
   $$(`[data-action-for="${id}"]`).forEach(el => { el.innerHTML = actionHTML(byId[id], el.dataset.size || ''); });
   $$(`[data-kg-for="${id}"]`).forEach(el => { el.innerHTML = kgPickHTML(byId[id]); });
@@ -1045,12 +1066,12 @@ document.addEventListener('click', e => {
   let x;
   if (state.dd && !el('.dd')) { state.dd = null; renderControls(); }
   if ((x = el('[data-add]'))) return setQty(x.dataset.add, firstOf(byId[x.dataset.add]));
-  if ((x = el('[data-inc]'))) return setQty(x.dataset.inc, (state.cart[x.dataset.inc] || 0) + stepOf(byId[x.dataset.inc]));
+  if ((x = el('[data-inc]'))) return setQty(x.dataset.inc, Math.round(((state.cart[x.dataset.inc] || 0) + stepOf(byId[x.dataset.inc])) * 10) / 10);
   if ((x = el('[data-kg]'))) { const [id, kg] = x.dataset.kg.split(':'); return setQty(id, +kg); }
   if ((x = el('[data-dec]'))) {
-    const id = x.dataset.dec, q = Math.max(0, (state.cart[id] || 0) - stepOf(byId[id]));
+    const id = x.dataset.dec, cur = state.cart[id] || 0, q = Math.max(0, Math.round((cur - stepOf(byId[id])) * 10) / 10);
     setQty(id, q);
-    if (q === 0) toast('Удалено из корзины', { label: 'Вернуть', fn: () => setQty(id, firstOf(byId[id])) });
+    if (q === 0) toast('Удалено из корзины', { label: 'Вернуть', fn: () => setQty(id, cur) });
     return;
   }
   if ((x = el('[data-remove]'))) { delete state.cart[x.dataset.remove]; save(); renderCart(); refreshQty(x.dataset.remove); return; }
