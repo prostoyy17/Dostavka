@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794571973';
+const BUILD = '1794572112';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -89,13 +89,10 @@ function totals() {
 }
 
 /* Весовые товары: шаг 0,5 кг, первое нажатие «+» — 1 кг */
-/* Весовые товары: вес выбирается с точностью 100 г (ползунок в окне товара),
-   кнопки «+» и «−» меняют вес на 0,5 кг. */
-const KG_STEP = 0.1;      // точность веса
-const KG_BTN = 0.5;       // шаг кнопок «+» / «−»
-const KG_MAX = 10;        // больше 10 кг одного товара на ползунке не предлагаем
-const stepOf = p => p && p.kg ? KG_BTN : 1;
-// сколько можно взять: для весовых — остаток, округлённый вниз до 100 г
+/* Весовые товары: вес только кратно 0,5 кг (0,5 · 1 · 1,5 · 2 · 2,5 …) — магазину так проще взвешивать */
+const KG_STEP = 0.5;
+const stepOf = p => p && p.kg ? KG_STEP : 1;
+// сколько можно взять: для весовых — остаток, округлённый вниз до 0,5 кг
 const maxOf = p => { const s = stockOf(p); return p && p.kg ? Math.round(Math.floor(s / KG_STEP + 1e-9) * KG_STEP * 10) / 10 : s; };
 // первое нажатие «+»: 1 кг (или сколько есть, если меньше), штучные — 1 шт
 const firstOf = p => p && p.kg ? Math.min(1, maxOf(p)) : 1;
@@ -151,29 +148,12 @@ function cardHTML(p) {
   </article>`;
 }
 function kgPickHTML(p) {
-  const q = state.cart[p.id] || 0, max = Math.min(maxOf(p), KG_MAX);
-  const v = q || Math.min(1, max);
-  const opts = [0.5, 1, 1.5, 2].filter(x => x <= max);
-  const pct = max > KG_STEP ? ((v - KG_STEP) / (max - KG_STEP)) * 100 : 100;
-  return `<div class="kgpick__head"><span class="kgpick__w" data-kgw>${fmtQty(p, v)}</span><span class="kgpick__p" data-kgp>≈ ${rubP(Math.round(p.price * v))}</span></div>
-    <input class="kgpick__range" type="range" min="${KG_STEP}" max="${max}" step="${KG_STEP}" value="${v}" data-kgrange="${p.id}" style="--pct:${pct}%" aria-label="Вес">
-    <div class="kgpick__opts">${opts.map(x => `<button class="${q === x ? 'on' : ''}" data-kg="${p.id}:${x}">${fmtQty(p, x)}</button>`).join('')}</div>
-    <div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)}` : `Выберите вес · ${rubP(p.price)} за 1 кг`}</div>
+  const q = state.cart[p.id] || 0;
+  const opts = [0.5, 1, 1.5, 2, 2.5, 3].filter(x => x <= maxOf(p));
+  return `<div class="kgpick__opts">${opts.map(x => `<button class="${q === x ? 'on' : ''}" data-kg="${p.id}:${x}">${fmtQty(p, x)}</button>`).join('')}</div>
+    <div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>≈ ${rubP(Math.round(p.price * q))}</b>` : `Выберите вес · ${rubP(p.price)} за 1 кг`}</div>
     <div class="kgpick__note">${WEIGHT_NOTE}</div>`;
 }
-// ползунок веса: пока тянут — меняем только подписи, отпустили — кладём в корзину
-document.addEventListener('input', e => {
-  const r = e.target.closest && e.target.closest('[data-kgrange]'); if (!r) return;
-  const p = byId[r.dataset.kgrange], v = stepQty(p, +r.value), box = r.closest('.kgpick');
-  const max = +r.max, min = +r.min;
-  r.style.setProperty('--pct', (max > min ? (v - min) / (max - min) * 100 : 100) + '%');
-  box.querySelector('[data-kgw]').textContent = fmtQty(p, v);
-  box.querySelector('[data-kgp]').textContent = '≈ ' + rubP(Math.round(p.price * v));
-});
-document.addEventListener('change', e => {
-  const r = e.target.closest && e.target.closest('[data-kgrange]'); if (!r) return;
-  setQty(r.dataset.kgrange, +r.value);
-});
 function refreshQty(id) {
   $$(`[data-action-for="${id}"]`).forEach(el => { el.innerHTML = actionHTML(byId[id], el.dataset.size || ''); });
   $$(`[data-kg-for="${id}"]`).forEach(el => { el.innerHTML = kgPickHTML(byId[id]); });
