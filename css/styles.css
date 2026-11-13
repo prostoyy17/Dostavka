@@ -857,18 +857,19 @@ html { background: var(--bg); }
 body.no-tabbar .tabbar { display: none !important; }
 body.no-tabbar .layout { padding-bottom: calc(30px + env(safe-area-inset-bottom)) !important; }
 .pt__eta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; white-space: nowrap; } .pt__eta small.pt__badge { margin-top: 0; }
-/* Строка поиска прилипает к верху, синий блок выезжает сверху и «подхватывает» её */
+/* Шапка-карточка как у Ozon: синяя, от самого верха экрана, скруглённый низ; при прокрутке остаётся только поиск */
+.top { position: sticky; top: var(--stick, 0px); z-index: 30; background: var(--accent); border-radius: 0 0 26px 26px; }
+.top::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 300px; background: var(--accent); }
+.top__inner { padding-bottom: 14px; }
 .top .search-slot { flex: 1; height: 50px; min-width: 0; }
 .top .search-slot .search { width: 100%; height: 100%; }
-.search--pinned { position: fixed; z-index: 31; margin: 0; }
-.stickybar { position: fixed; left: 0; right: 0; top: 0; z-index: 30; height: calc(env(safe-area-inset-top) + 12px + 48px + 14px);
-  background: var(--accent); border-radius: 0 0 26px 26px; transform: translateY(-100%); visibility: hidden;
-  transition: transform .3s cubic-bezier(.2, .8, .2, 1), visibility 0s .3s; }
-body.sticky-on .stickybar { transform: none; visibility: visible; transition: transform .3s cubic-bezier(.2, .8, .2, 1); }
+.top .loc__title, .top .loc__title svg { color: #fff; }
+.top .loc__meta { color: rgba(255, 255, 255, .78); }
+.top .search:focus-within { box-shadow: 0 0 0 2px rgba(255, 255, 255, .7); }
+.top .round-btn { background: rgba(255, 255, 255, .16); color: #fff; }
+.layout { padding-top: 16px; }
 @media (max-width: 760px) {
   .top .search-slot { order: 3; flex-basis: 100%; height: 48px; }
   .top .search { order: initial; flex-basis: auto; }
+  .layout { padding-top: 14px !important; }
 }
-body.sticky-on .top { z-index: 32; }
-/* синий блок заходит выше края экрана — закрывает полосу под часами Safari сразу, без зазора */
-.stickybar { top: -160px; height: calc(160px + env(safe-area-inset-top) + 12px + 48px + 14px); transform: translateY(-110%); }

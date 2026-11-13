@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794603395';
+const BUILD = '1794603733';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -1123,34 +1123,16 @@ $('#overlay').addEventListener('click', closeAll);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAll(); if (state.dd) { state.dd = null; renderControls(); } } });
 
 let searchT;
-/* Строка поиска «прилипает» к верху: доезжает до верха экрана и остаётся на месте,
-   а синий блок выезжает сверху и подхватывает её. */
+/* Шапка как у Ozon: синяя карточка «прилипает» к верху (position: sticky) так,
+   что видна только строка поиска; верхняя строка уезжает, товары уходят под карточку.
+   Здесь только считаем, на сколько карточке можно уехать вверх. */
 (() => {
-  const slot = $('.top .search-slot'), field = slot.querySelector('.search');
-  const probe = document.createElement('div');
-  probe.style.cssText = 'position:fixed;top:0;height:env(safe-area-inset-top);visibility:hidden;pointer-events:none';
-  document.body.appendChild(probe);
-  let pinned = false, raf = 0;
-  const check = () => {
-    raf = 0;
-    const pinTop = probe.offsetHeight + 12;
-    const r = slot.getBoundingClientRect();
-    const want = state.route === 'catalog' && r.top <= pinTop;
-    if (want) Object.assign(field.style, { top: pinTop + 'px', left: r.left + 'px', width: r.width + 'px', height: r.height + 'px' });
-    if (want === pinned) return;
-    pinned = want;
-    field.classList.toggle('search--pinned', want);
-    if (!want) Object.assign(field.style, { top: '', left: '', width: '', height: '' });
-    document.body.classList.toggle('sticky-on', want);
-    // цвет строки с часами (для браузеров, которые его учитывают)
-    const m = document.querySelector('meta[name=theme-color]');
-    if (m) m.content = want ? getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() : (document.documentElement.dataset.theme === 'dark' ? '#000000' : '#EEEDE8');
-  };
-  const queue = () => { if (!raf) raf = requestAnimationFrame(check); };
-  window.addEventListener('scroll', queue, { passive: true });
-  window.addEventListener('resize', () => { pinned = !pinned; check(); });
-  window.addEventListener('hashchange', () => setTimeout(check, 0));
-  check();
+  const top = $('.top'), slot = top.querySelector('.search-slot');
+  const fit = () => top.style.setProperty('--stick', -(slot.offsetTop - 12) + 'px');
+  fit();
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', () => setTimeout(fit, 0));
+  if (document.fonts) document.fonts.ready.then(fit);
 })();
 $('#searchInput').addEventListener('input', e => {
   clearTimeout(searchT);
