@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794602197';
+const BUILD = '1794602987';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -1034,7 +1034,7 @@ function toast(msg, action) {
 function goCatalog(cat) {
   if (state.route === 'catalog') rememberScroll();
   state.cat = cat; state.sub = null; state.dd = null;
-  state.query = ''; $('#searchInput').value = ''; $('#stickySearch').value = '';
+  state.query = ''; $('#searchInput').value = '';
   const m = scrollMem[pageKey()]; state.limit = m ? m.limit : 60;   // раздел, где уже были, открывается на том же месте
   if (state.route !== 'catalog') { location.hash = '#/'; return; }
   renderPage();
@@ -1123,24 +1123,31 @@ $('#overlay').addEventListener('click', closeAll);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAll(); if (state.dd) { state.dd = null; renderControls(); } } });
 
 let searchT;
-/* Шапка с поиском при прокрутке: показываем, когда обычная строка поиска ушла за верх экрана */
+/* Строка поиска «прилипает» к верху: доезжает до верха экрана и остаётся на месте,
+   а синий блок выезжает сверху и подхватывает её. */
 (() => {
-  const main = $('#searchInput'), sticky = $('#stickySearch'), bar = $('#stickyBar');
-  let offscreen = false;
-  const update = () => {
-    const on = state.route === 'catalog' && (offscreen || document.activeElement === sticky);
-    document.body.classList.toggle('sticky-on', on);
-    sticky.tabIndex = on ? 0 : -1;
+  const slot = $('.top .search-slot'), field = slot.querySelector('.search');
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;top:0;height:env(safe-area-inset-top);visibility:hidden;pointer-events:none';
+  document.body.appendChild(probe);
+  let pinned = false, raf = 0;
+  const check = () => {
+    raf = 0;
+    const pinTop = probe.offsetHeight + 12;
+    const r = slot.getBoundingClientRect();
+    const want = state.route === 'catalog' && r.top <= pinTop;
+    if (want) Object.assign(field.style, { top: pinTop + 'px', left: r.left + 'px', width: r.width + 'px', height: r.height + 'px' });
+    if (want === pinned) return;
+    pinned = want;
+    field.classList.toggle('search--pinned', want);
+    if (!want) Object.assign(field.style, { top: '', left: '', width: '', height: '' });
+    document.body.classList.toggle('sticky-on', want);
   };
-  new IntersectionObserver(([e]) => { offscreen = !e.isIntersecting && e.boundingClientRect.top < 0; update(); })
-    .observe(main.closest('.search'));
-  // пока печатают в верхней строке, держим обычную строку поиска спрятанной под ней — без двух полей сразу
-  const keepUnder = () => { if (document.activeElement !== sticky) return; const r = main.closest('.search').getBoundingClientRect(); if (r.bottom > 0) window.scrollTo(0, window.scrollY + r.bottom + 8); };
-  sticky.addEventListener('input', () => { main.value = sticky.value; main.dispatchEvent(new Event('input')); setTimeout(keepUnder, 260); });
-  main.addEventListener('input', () => { sticky.value = main.value; });
-  sticky.addEventListener('focus', update);
-  sticky.addEventListener('blur', () => setTimeout(update, 50));
-  window.addEventListener('hashchange', () => setTimeout(update, 0));
+  const queue = () => { if (!raf) raf = requestAnimationFrame(check); };
+  window.addEventListener('scroll', queue, { passive: true });
+  window.addEventListener('resize', () => { pinned = !pinned; check(); });
+  window.addEventListener('hashchange', () => setTimeout(check, 0));
+  check();
 })();
 $('#searchInput').addEventListener('input', e => {
   clearTimeout(searchT);
