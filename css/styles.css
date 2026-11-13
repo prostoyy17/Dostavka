@@ -870,3 +870,5 @@ body.sticky-on .stickybar { transform: none; visibility: visible; transition: tr
   .top .search { order: initial; flex-basis: auto; }
 }
 body.sticky-on .top { z-index: 32; }
+/* синий блок заходит выше края экрана — закрывает полосу под часами Safari сразу, без зазора */
+.stickybar { top: -160px; height: calc(160px + env(safe-area-inset-top) + 12px + 48px + 14px); transform: translateY(-110%); }

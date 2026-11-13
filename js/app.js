@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794602987';
+const BUILD = '1794603395';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -1142,6 +1142,9 @@ let searchT;
     field.classList.toggle('search--pinned', want);
     if (!want) Object.assign(field.style, { top: '', left: '', width: '', height: '' });
     document.body.classList.toggle('sticky-on', want);
+    // цвет строки с часами (для браузеров, которые его учитывают)
+    const m = document.querySelector('meta[name=theme-color]');
+    if (m) m.content = want ? getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() : (document.documentElement.dataset.theme === 'dark' ? '#000000' : '#EEEDE8');
   };
   const queue = () => { if (!raf) raf = requestAnimationFrame(check); };
   window.addEventListener('scroll', queue, { passive: true });
