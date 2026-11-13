@@ -872,3 +872,4 @@ body.sticky-header .layout { padding-top: 16px; }
   .top .search { order: initial; flex-basis: auto; }
   body.sticky-header .layout { padding-top: 14px !important; }
 }
+@media (max-width: 760px) { .top__inner { padding-top: 6px; } }
