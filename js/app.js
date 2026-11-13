@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794572599';
+const BUILD = '1794572814';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -1023,11 +1023,13 @@ function toast(msg, action) {
   const el = document.createElement('div');
   el.className = 'toast';
   el.innerHTML = `<span>${msg}</span>${action ? `<button>${action.label}</button>` : ''}`;
-  if (action) el.querySelector('button').onclick = () => { action.fn(); el.remove(); };
+  // плавное исчезновение: сообщение уезжает вниз и тает, потом удаляется
+  const hide = () => { if (el.classList.contains('hide')) return; el.classList.add('hide'); setTimeout(() => el.remove(), 320); };
+  if (action) el.querySelector('button').onclick = () => { action.fn(); hide(); };
   const box = $('#toasts');
   box.appendChild(el);
-  while (box.children.length > 2) box.firstChild.remove();
-  setTimeout(() => { el.classList.add('hide'); setTimeout(() => el.remove(), 200); }, action ? 4000 : 2200);
+  [...box.children].slice(0, -2).forEach(old => old.classList.contains('hide') || (old.classList.add('hide'), setTimeout(() => old.remove(), 320)));
+  setTimeout(hide, action ? 4000 : 2400);
 }
 
 /* ================= Events ================= */
