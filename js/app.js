@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794572112';
+const BUILD = '1794572599';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -149,9 +149,7 @@ function cardHTML(p) {
 }
 function kgPickHTML(p) {
   const q = state.cart[p.id] || 0;
-  const opts = [0.5, 1, 1.5, 2, 2.5, 3].filter(x => x <= maxOf(p));
-  return `<div class="kgpick__opts">${opts.map(x => `<button class="${q === x ? 'on' : ''}" data-kg="${p.id}:${x}">${fmtQty(p, x)}</button>`).join('')}</div>
-    <div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>≈ ${rubP(Math.round(p.price * q))}</b>` : `Выберите вес · ${rubP(p.price)} за 1 кг`}</div>
+  return `<div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>≈ ${rubP(Math.round(p.price * q))}</b>` : `${rubP(p.price)} за 1 кг · шаг 0,5 кг`}</div>
     <div class="kgpick__note">${WEIGHT_NOTE}</div>`;
 }
 function refreshQty(id) {
