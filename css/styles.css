@@ -808,3 +808,12 @@ html { background: var(--bg); }
 .overlay { background: transparent; visibility: hidden; transition: background-color .2s, visibility 0s .2s; opacity: 1; }
 .overlay.show { background: rgba(10, 15, 12, .5); visibility: visible; transition: background-color .2s; }
 .modal:not(.show) { visibility: hidden; }
+
+/* выбор веса для весовых товаров */
+.kgpick { display: flex; flex-direction: column; gap: 10px; }
+.kgpick__opts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.kgpick__opts button { height: 46px; border-radius: 14px; background: var(--surface-2); color: var(--text); font-weight: 700; font-size: 15px; transition: background .15s, color .15s; }
+.kgpick__opts button.on { background: var(--accent); color: #fff; }
+.kgpick__sum { font-size: 14.5px; color: var(--text-2); }
+.kgpick__sum b { color: var(--text); }
+.stepper--round span { min-width: 20px; white-space: nowrap; padding: 0 2px; }
