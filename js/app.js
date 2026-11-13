@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794572814';
+const BUILD = '1794590905';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -167,7 +167,24 @@ function parseRoute() {
   const h = location.hash.replace(/^#\/?/, '');
   state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart', 'login'].find(r => h.startsWith(r)) || 'catalog';
 }
-window.addEventListener('hashchange', () => { parseRoute(); closeAll(); renderPage(); window.scrollTo(0, 0); });
+/* Память прокрутки: у каждого экрана (и у каждого раздела каталога) своя позиция.
+   Ушёл с главной в «Избранное» и вернулся — главная открывается там же, где была. */
+const scrollMem = {};
+const pageKey = () => state.route === 'catalog' ? `catalog:${state.cat}:${state.sub || ''}:${state.query || ''}` : state.route;
+function rememberScroll() {
+  scrollMem[pageKey()] = { y: window.scrollY, limit: state.limit, rows: [...document.querySelectorAll('#page .hrow')].map(r => r.scrollLeft) };
+}
+function restoreScroll() {
+  const m = scrollMem[pageKey()];
+  const apply = () => {
+    if (!m) { window.scrollTo(0, 0); return; }
+    document.querySelectorAll('#page .hrow').forEach((r, i) => { r.scrollLeft = m.rows[i] || 0; });
+    window.scrollTo(0, m.y);
+  };
+  apply(); requestAnimationFrame(apply);   // второй раз — после того как браузер разложит страницу
+}
+// hashchange приходит до перерисовки, поэтому позиция старого экрана ещё на месте (работает и для жеста «назад»)
+window.addEventListener('hashchange', () => { rememberScroll(); parseRoute(); closeAll(); renderPage(); restoreScroll(); });
 
 function renderPage() {
   const navOf = { address: 'account', about: 'account', settings: 'account', orders: 'account', login: 'account' };
@@ -1034,11 +1051,13 @@ function toast(msg, action) {
 
 /* ================= Events ================= */
 function goCatalog(cat) {
-  state.cat = cat; state.sub = null; state.limit = 60; state.dd = null;
+  if (state.route === 'catalog') rememberScroll();
+  state.cat = cat; state.sub = null; state.dd = null;
   state.query = ''; $('#searchInput').value = '';
+  const m = scrollMem[pageKey()]; state.limit = m ? m.limit : 60;   // раздел, где уже были, открывается на том же месте
   if (state.route !== 'catalog') { location.hash = '#/'; return; }
   renderPage();
-  window.scrollTo(0, 0);
+  restoreScroll();
 }
 
 document.addEventListener('click', e => {
