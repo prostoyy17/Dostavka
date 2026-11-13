@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794564374';
+const BUILD = '1794564488';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -50,7 +50,8 @@ state.mode = 'delivery';
 const point = () => POINTS.find(p => p.id === state.point);
 const stockOf = (p, pid = state.point || POINTS[0].id) => p ? (p.stock[pid] || 0) : 0;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const rubP = n => (Math.round(n * 100) / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '\u00a0₽';
+// Цены везде в целых рублях — копейки не показываем
+const rubP = n => Math.round(n).toLocaleString('ru-RU') + '\u00a0₽';
 const pic = (p, cls = 'ic') => p.img ? `<img class="${cls} photo" src="${p.img}" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.className='${cls}';this.src='assets/icons/${p.icon}.webp'">` : ic(p.icon, cls);
 const pad2 = n => String(n % 24).padStart(2, '0');
 // hours: [открытие, закрытие]; закрытие больше 24 означает «после полуночи» (25 = 01:00 ночи)
@@ -71,7 +72,7 @@ applyTheme();
 function cartLines() {
   return Object.entries(state.cart).filter(([id]) => byId[id]).map(([id, qty]) => {
     const p = byId[id], avail = stockOf(p);
-    return { p, qty, avail, ok: avail >= qty && avail > 0, sum: p.price * qty };
+    return { p, qty, avail, ok: avail >= qty && avail > 0, sum: Math.round(p.price * qty) };
   });
 }
 function totals() {
@@ -145,7 +146,7 @@ function kgPickHTML(p) {
   const q = state.cart[p.id] || 0, s = stockOf(p);
   const opts = [0.5, 1, 1.5, 2].filter(v => v <= s);
   return `<div class="kgpick__opts">${opts.map(v => `<button class="${q === v ? 'on' : ''}" data-kg="${p.id}:${v}">${fmtQty(p, v)}</button>`).join('')}</div>
-    <div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>${rubP(p.price * q)}</b>` : `Выберите вес · ${rubP(p.price)} за 1 кг`}</div>`;
+    <div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>${rubP(Math.round(p.price * q))}</b>` : `Выберите вес · ${rubP(p.price)} за 1 кг`}</div>`;
 }
 function refreshQty(id) {
   $$(`[data-action-for="${id}"]`).forEach(el => { el.innerHTML = actionHTML(byId[id], el.dataset.size || ''); });
