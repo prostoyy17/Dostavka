@@ -857,16 +857,15 @@ html { background: var(--bg); }
 body.no-tabbar .tabbar { display: none !important; }
 body.no-tabbar .layout { padding-bottom: calc(30px + env(safe-area-inset-bottom)) !important; }
 .pt__eta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; white-space: nowrap; } .pt__eta small.pt__badge { margin-top: 0; }
-/* Шапка-карточка как у Ozon: синяя, от самого верха экрана, скруглённый низ; при прокрутке остаётся только поиск */
-.top { position: sticky; top: var(--stick, 0px); z-index: 30; background: var(--accent); border-radius: 0 0 26px 26px; }
-.top::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 300px; background: var(--accent); }
+/* Шапка как у Ozon: цвета фона страницы — наверху её не видно; при прокрутке сжимается до строки поиска,
+   товары уходят под неё, и становится заметен её скруглённый низ с лёгкой тенью */
+.top { position: sticky; top: var(--stick, 0px); z-index: 30; background: var(--bg); border-radius: 0 0 26px 26px; transition: box-shadow .25s; }
+.top::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 300px; background: var(--bg); }
+.top.top--stuck { box-shadow: 0 8px 24px -10px rgba(14, 20, 51, .22); }
+:root[data-theme="dark"] .top.top--stuck { box-shadow: 0 8px 24px -10px rgba(0, 0, 0, .8); }
 .top__inner { padding-bottom: 14px; }
 .top .search-slot { flex: 1; height: 50px; min-width: 0; }
 .top .search-slot .search { width: 100%; height: 100%; }
-.top .loc__title, .top .loc__title svg { color: #fff; }
-.top .loc__meta { color: rgba(255, 255, 255, .78); }
-.top .search:focus-within { box-shadow: 0 0 0 2px rgba(255, 255, 255, .7); }
-.top .round-btn { background: rgba(255, 255, 255, .16); color: #fff; }
 .layout { padding-top: 16px; }
 @media (max-width: 760px) {
   .top .search-slot { order: 3; flex-basis: 100%; height: 48px; }
