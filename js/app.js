@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794603930';
+const BUILD = '1794604249';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -1127,6 +1127,8 @@ let searchT;
    что видна только строка поиска; верхняя строка уезжает, товары уходят под карточку.
    Здесь только считаем, на сколько карточке можно уехать вверх. */
 (() => {
+  if (typeof STICKY_HEADER === 'undefined' || !STICKY_HEADER) return;
+  document.body.classList.add('sticky-header');
   const top = $('.top'), slot = top.querySelector('.search-slot');
   const fit = () => top.style.setProperty('--stick', -(slot.offsetTop - 12) + 'px');
   fit();
