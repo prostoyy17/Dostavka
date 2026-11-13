@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794590905';
+const BUILD = '1794596852';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -190,6 +190,7 @@ function renderPage() {
   const navOf = { address: 'account', about: 'account', settings: 'account', orders: 'account', login: 'account' };
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (navOf[state.route] || state.route)));
   document.body.classList.toggle('sub', state.route !== 'catalog');
+  document.body.classList.toggle('no-tabbar', state.route === 'login');
   renderCats();
   if (state.route === 'favorites') { renderFavorites(); return addGap(); }
   if (state.route === 'orders') { renderOrders(); return addBack(); }
@@ -198,7 +199,7 @@ function renderPage() {
   if (state.route === 'address') return renderAddress();
   if (state.route === 'about') return renderAbout();
   if (state.route === 'settings') return renderSettings();
-  if (state.route === 'login') { renderAuth(); return addGap(); }
+  if (state.route === 'login') { renderAuth(); return addBack(); }
   renderCatalogPage();
 }
 
@@ -482,7 +483,7 @@ function renderAuth() {
     const tabs = page.querySelector('.auth__tabs'); tabs.dataset.tab = to;
     tabs.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
     page.querySelector('.auth__form').classList.add('auth__form--out');
-    setTimeout(() => { renderAuth(); addGap(); }, 180);
+    setTimeout(() => { renderAuth(); addBack(); }, 180);
   });
   page.querySelectorAll('[data-eye]').forEach(b => b.onclick = () => {
     const i = $('#' + b.dataset.eye), show = i.type === 'password';
@@ -621,25 +622,6 @@ function renderPoint() {
     : 'Грозный';
 }
 
-function mapSVG(sel) {
-  const roads = `<path d="M40 70 C120 90 200 100 262 118 S380 120 470 100"/><path d="M148 196 C190 160 230 140 262 118"/><path d="M262 118 C290 150 310 180 330 206"/><path d="M148 196 C220 215 280 215 330 206"/><path d="M60 230 C100 215 120 205 148 196"/><path d="M330 206 C380 220 430 240 470 250"/>`;
-  const pins = POINTS.map(p => {
-    const on = p.id === sel;
-    return `<g class="map-pin" data-pick="${p.id}" transform="translate(${p.x},${p.y})">
-      ${on ? '<circle r="20" fill="#0033B0" opacity=".18"/>' : ''}
-      <circle r="${on ? 10 : 8}" fill="${on ? '#0033B0' : '#fff'}" stroke="${on ? '#fff' : '#0033B0'}" stroke-width="3"/>
-      <text y="-18" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">${p.city}</text>
-    </g>`;
-  }).join('');
-  return `<svg viewBox="20 30 470 250" preserveAspectRatio="xMidYMid meet" style="color:var(--text)">
-    <path d="M30 40 C140 60 220 70 300 60 S420 40 500 55" fill="none" stroke="#5aa9e6" stroke-width="5" stroke-linecap="round" opacity=".55"/>
-    <text x="440" y="44" font-size="11" fill="#5aa9e6">Терек</text>
-    <path d="M300 320 C305 250 290 170 262 118" fill="none" stroke="#5aa9e6" stroke-width="3" opacity=".5"/>
-    <text x="300" y="268" font-size="11" fill="#5aa9e6">Аргун</text>
-    <g fill="none" stroke="currentColor" stroke-opacity=".2" stroke-width="3" stroke-linecap="round">${roads}</g>
-    ${pins}
-  </svg>`;
-}
 
 function openPoints() {
   let sel = state.point || POINTS[0].id;
@@ -649,7 +631,6 @@ function openPoints() {
     $('#modal').innerHTML = `
       <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
       <div class="pts">
-        <div class="pts__map">${mapSVG(sel)}</div>
         <div class="pts__list">
           <h2 class="pts__title">Доставка по Грозному</h2>
           ${POINTS.map(p => {
@@ -658,7 +639,7 @@ function openPoints() {
             return `<button class="pt ${p.id === sel ? 'active' : ''}" data-pick="${p.id}">
               <span class="pt__city">${p.city}</span>
               <span class="pt__addr">Товары из магазинов: ${p.store}</span>
-              <span class="pt__eta">${p.eta}<small class="${open ? '' : 'closed'}">${open ? 'Открыто' : 'Закрыто'}</small></span>
+              <span class="pt__eta">${p.eta}<small class="pt__badge ${open ? '' : 'closed'}">${open ? 'Открыто' : 'Закрыто'}</small></span>
               <span class="pt__info">${hours(p)} · ${n.toLocaleString('ru-RU')} товаров · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно${p.minOrder ? ` · заказ от ${rub(p.minOrder)}` : ''}</span>
             </button>`;
           }).join('')}
