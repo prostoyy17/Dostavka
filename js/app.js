@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794553956';
+const BUILD = '1794554188';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -305,7 +305,7 @@ function addressText() {
 function renderAccount() {
   $('#page').innerHTML = `
     <div class="acc acc--top">
-      ${state.user ? `<div class="acc__card acc__row acc__me">${iconBox('user', 'acc__tile')}<span class="acc__text"><small>Аккаунт</small><b>${esc(state.user.name || state.user.phone || state.user.email)}</b>${[state.user.name && state.user.phone, state.user.name || state.user.phone ? state.user.email : ''].filter(Boolean).map(x => `<em>${esc(x)}</em>`).join('')}</span></div>`
+      ${state.user ? `<div class="acc__card acc__row acc__me">${iconBox('user', 'acc__tile')}<span class="acc__text"><small>Аккаунт</small><b>${esc(state.user.name || state.user.phone)}</b>${state.user.name ? `<em>${esc(state.user.phone)}</em>` : ''}</span></div>`
         : `<button class="acc__login" data-action="login">Войти или зарегистрироваться</button>`}
       <a class="acc__card acc__row" href="#/address">
         ${iconBox('pin', 'acc__tile')}
@@ -383,7 +383,7 @@ function renderAbout() {
 
 /* ================= Вход и регистрация =================
    Пока нет сервера, аккаунт хранится только в этом браузере (пароль — в виде SHA-256 хеша).
-   Черновик формы (вкладка, телефон, почта) сохраняется, чтобы не терялся при обновлении страницы. Пароль не сохраняется. */
+   Черновик формы (вкладка, имя, телефон) сохраняется, чтобы не терялся при обновлении страницы. Пароль не сохраняется. */
 // цифры номера без кода страны: «+7 …», «8 …» и «7 …» в начале — это код, а не часть номера
 const phoneDigits = v => {
   let t = String(v).trim(), d;
@@ -400,8 +400,6 @@ const fmtDigits = d => {
   if (d.length >= 8) out += '-' + d.slice(8, 10);
   return out;
 };
-const looksLikePhone = v => /^[\s+()\-\d]+$/.test(v) && /\d/.test(v);
-const validEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 const sha256 = async t => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('mayr:' + t)))].map(b => b.toString(16).padStart(2, '0')).join('');
 
 function renderAuth() {
@@ -418,7 +416,7 @@ function renderAuth() {
       ${tab === 'login' ? `
       <form class="auth__form" id="authForm" novalidate>
         <h1 class="auth__title">Вход в аккаунт</h1>
-        <div class="auth__field"><input id="aLogin" placeholder="Телефон или почта" autocomplete="username" inputmode="email" value="${esc(draft.login || '')}"></div>
+        <div class="auth__field"><input id="aLogin" type="tel" placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" value="${esc(fmtDigits(phoneDigits(draft.login || '')))}"></div>
         ${pass('aPass', 'Пароль')}
         <div class="auth__err" id="authErr"></div>
         <button class="auth__submit" type="submit">Войти</button>
@@ -427,9 +425,7 @@ function renderAuth() {
         <h1 class="auth__title">Создать аккаунт</h1>
         <div class="auth__field"><input id="aName" placeholder="Имя" autocomplete="given-name" autocapitalize="words" maxlength="40" value="${esc(draft.name || '')}"></div>
         <div class="auth__field"><input id="aPhone" type="tel" placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" value="${esc(fmtDigits(draft.phone || ''))}"></div>
-        <div class="auth__field"><input id="aEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email" value="${esc(draft.email || '')}"></div>
         ${pass('aPass', 'Пароль (минимум 3 символа)')}
-        <div class="auth__hint">Укажите телефон, почту или и то и другое</div>
         <div class="auth__err" id="authErr"></div>
         <button class="auth__submit" type="submit">Создать аккаунт</button>
       </form>`}
@@ -439,7 +435,6 @@ function renderAuth() {
     const d = LS.get('authDraft', {}); d.tab = tab;
     if ($('#aLogin')) d.login = $('#aLogin').value;
     if ($('#aPhone')) d.phone = phoneDigits($('#aPhone').value);
-    if ($('#aEmail')) d.email = $('#aEmail').value;
     if ($('#aName')) d.name = $('#aName').value;
     LS.set('authDraft', d);
   };
@@ -458,12 +453,12 @@ function renderAuth() {
     const i = $('#' + b.dataset.eye), show = i.type === 'password';
     i.type = show ? 'text' : 'password'; b.innerHTML = svgI(show ? 'eyeoff' : 'eye', 22);
   });
-  // маска телефона: +7 (XXX) XXX-XX-XX; в поле «Телефон или почта» — только если вводят цифры
-  const mask = (inp, always) => {
+  // маска телефона: +7 (XXX) XXX-XX-XX
+  const mask = inp => {
     if (!inp) return;
     let prev = phoneDigits(inp.value);
     inp.addEventListener('input', e => {
-      if (always || looksLikePhone(inp.value)) {
+      {
         let d = phoneDigits(inp.value);
         if (/^delete/.test(e.inputType || '') && d === prev) d = d.slice(0, -1);   // стёрли скобку или чёрточку — стираем и цифру
         if (!prev && d === '7' && !/^delete/.test(e.inputType || '')) d = '';   // «+7» набрали вручную после автоподстановки «+7 (»
@@ -474,8 +469,8 @@ function renderAuth() {
       err(''); inp.parentElement.classList.remove('bad'); saveDraft();
     });
   };
-  mask($('#aPhone'), true); mask($('#aLogin'), false);
-  [$('#aName'), $('#aEmail'), $('#aPass')].forEach(i => i && i.addEventListener('input', () => { err(''); i.parentElement.classList.remove('bad'); saveDraft(); }));
+  mask($('#aPhone')); mask($('#aLogin'));
+  [$('#aName'), $('#aPass')].forEach(i => i && i.addEventListener('input', () => { err(''); i.parentElement.classList.remove('bad'); saveDraft(); }));
   const bad = (id, m) => { $('#' + id).parentElement.classList.add('bad'); err(m); $('#' + id).focus(); };
 
   $('#authForm').onsubmit = async e => {
@@ -483,29 +478,25 @@ function renderAuth() {
     const accounts = LS.get('accounts', []);
     const pw = $('#aPass').value;
     if (tab === 'login') {
-      const v = $('#aLogin').value.trim();
-      if (!v) return bad('aLogin', 'Введите телефон или почту');
-      const byPhone = looksLikePhone(v);
-      if (byPhone && phoneDigits(v).length !== 10) return bad('aLogin', 'Номер телефона введён не полностью');
-      if (!byPhone && !validEmail(v)) return bad('aLogin', 'Проверьте почту — например, name@mail.ru');
+      const ph = phoneDigits($('#aLogin').value);
+      if (!ph) return bad('aLogin', 'Введите номер телефона');
+      if (ph.length !== 10) return bad('aLogin', 'Номер телефона введён не полностью');
       if (!pw) return bad('aPass', 'Введите пароль');
-      const acc = accounts.find(a => byPhone ? a.phone === phoneDigits(v) : a.email === v.toLowerCase());
+      const acc = accounts.find(a => a.phone === ph);
       if (!acc || acc.hash !== await sha256(pw)) return bad('aPass', 'Неверный логин или пароль');
-      state.user = { name: acc.name || '', phone: acc.phone ? fmtDigits(acc.phone) : '', email: acc.email || '' };
+      state.user = { name: acc.name || '', phone: fmtDigits(acc.phone) };
     } else {
       const nm = $('#aName').value.trim().replace(/\s+/g, ' ');
       if (!nm) return bad('aName', 'Введите имя');
-      const ph = phoneDigits($('#aPhone').value), em = $('#aEmail').value.trim().toLowerCase();
-      if (!ph && !em) return bad('aPhone', 'Укажите телефон или почту');
+      const ph = phoneDigits($('#aPhone').value);
+      if (!ph) return bad('aPhone', 'Введите номер телефона');
       if (ph && ph.length !== 10) return bad('aPhone', 'Номер телефона введён не полностью');
-      if (em && !validEmail(em)) return bad('aEmail', 'Проверьте почту — например, name@mail.ru');
       if (pw.length < 3) return bad('aPass', 'Пароль — минимум 3 символа');
       if (ph && accounts.some(a => a.phone === ph)) return bad('aPhone', 'Этот номер уже зарегистрирован — войдите');
-      if (em && accounts.some(a => a.email === em)) return bad('aEmail', 'Эта почта уже зарегистрирована — войдите');
-      accounts.push({ name: nm, phone: ph, email: em, hash: await sha256(pw) }); LS.set('accounts', accounts);
-      state.user = { name: nm, phone: ph ? fmtDigits(ph) : '', email: em };
+      accounts.push({ name: nm, phone: ph, hash: await sha256(pw) }); LS.set('accounts', accounts);
+      state.user = { name: nm, phone: fmtDigits(ph) };
     }
-    LS.set('user', state.user); LS.set('authDraft', { tab: 'login', login: '', phone: '', email: '', name: '' });
+    LS.set('user', state.user); LS.set('authDraft', { tab: 'login', login: '', phone: '', name: '' });
     toast(tab === 'login' ? 'Вы вошли в аккаунт' : 'Аккаунт создан');
     location.hash = '#/account';
   };
