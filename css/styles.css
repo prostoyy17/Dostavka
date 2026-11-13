@@ -863,12 +863,12 @@ body.sticky-header .top { position: sticky; top: var(--stick, 0px); z-index: 30;
 body.sticky-header .top::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 300px; background: var(--bg); }
 .top.top--stuck { box-shadow: 0 8px 24px -10px rgba(14, 20, 51, .22); }
 :root[data-theme="dark"] .top.top--stuck { box-shadow: 0 8px 24px -10px rgba(0, 0, 0, .8); }
-.top__inner { padding-bottom: 14px; }
+body.sticky-header .top__inner { padding-bottom: 14px; }
 .top .search-slot { flex: 1; height: 50px; min-width: 0; }
 .top .search-slot .search { width: 100%; height: 100%; }
-.layout { padding-top: 16px; }
+body.sticky-header .layout { padding-top: 16px; }
 @media (max-width: 760px) {
   .top .search-slot { order: 3; flex-basis: 100%; height: 48px; }
   .top .search { order: initial; flex-basis: auto; }
-  .layout { padding-top: 14px !important; }
+  body.sticky-header .layout { padding-top: 14px !important; }
 }
