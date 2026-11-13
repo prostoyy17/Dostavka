@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794564488';
+const BUILD = '1794564885';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -71,7 +71,7 @@ applyTheme();
 /* ================= Cart math ================= */
 function cartLines() {
   return Object.entries(state.cart).filter(([id]) => byId[id]).map(([id, qty]) => {
-    const p = byId[id], avail = stockOf(p);
+    const p = byId[id], avail = maxOf(p);
     return { p, qty, avail, ok: avail >= qty && avail > 0, sum: Math.round(p.price * qty) };
   });
 }
@@ -91,14 +91,18 @@ function totals() {
 /* Весовые товары: шаг 0,5 кг, первое нажатие «+» — 1 кг */
 const KG_STEP = 0.5;
 const stepOf = p => p && p.kg ? KG_STEP : 1;
-const firstOf = p => 1;
-const fmtQty = (p, q) => p && p.kg ? `${String(q).replace('.', ',')} кг` : String(q);
+// сколько можно взять: для весовых — остаток, округлённый вниз до 0,5 кг
+const maxOf = p => { const s = stockOf(p); return p && p.kg ? Math.floor(s / KG_STEP + 1e-9) * KG_STEP : s; };
+// первое нажатие «+»: 1 кг (или сколько есть, если меньше), штучные — 1 шт
+const firstOf = p => p && p.kg ? Math.min(1, maxOf(p)) : 1;
+const fmtQty = (p, q) => p && p.kg ? `${String(Math.round(q * 10) / 10).replace('.', ',')} кг` : `${q} шт`;
+const stepQty = (p, q) => p && p.kg ? Math.round(q / KG_STEP) * KG_STEP : Math.round(q);
+const WEIGHT_NOTE = 'Весовые товары взвешивают в магазине: вес и сумма могут немного отличаться. Точную сумму курьер назовёт при доставке.';
 function setQty(id, qty) {
   const p = byId[id];
-  const max = stockOf(p);
+  const max = maxOf(p);
   const prev = state.cart[id] || 0;
-  if (p.kg) qty = Math.round(qty / KG_STEP) * KG_STEP;
-  qty = Math.max(0, Math.min(qty, max));
+  qty = Math.max(0, Math.min(stepQty(p, qty), max));
   if (qty === prev && qty >= max && qty > 0) { toast('Больше нет в наличии'); return; }
   if (qty === 0) delete state.cart[id]; else state.cart[id] = qty;
   save();
@@ -109,18 +113,18 @@ function setQty(id, qty) {
 /* ================= Product card ================= */
 function actionHTML(p, size = '') {
   const q = state.cart[p.id] || 0;
-  const s = stockOf(p);
+  const s = maxOf(p);
   if (size.includes('round')) {
     if (s === 0) return '';
     if (!q) return `<button class="add-btn add-btn--round" data-add="${p.id}" aria-label="В корзину">${svgI('plus', 20)}</button>`;
-    return `<div class="stepper stepper--round"><button data-dec="${p.id}" aria-label="Меньше">${svgI('minus', 16)}</button><span>${fmtQty(p, q)}</span><button data-inc="${p.id}" aria-label="Больше" ${q + stepOf(p) > s ? 'disabled' : ''}>${svgI('plus', 16)}</button></div>`;
+    return `<div class="stepper stepper--round"><button data-dec="${p.id}" aria-label="Меньше">${svgI('minus', 16)}</button><span>${p.kg ? fmtQty(p, q) : q}</span><button data-inc="${p.id}" aria-label="Больше" ${q + stepOf(p) > maxOf(p) ? 'disabled' : ''}>${svgI('plus', 16)}</button></div>`;
   }
   if (s === 0) return `<button class="add-btn" disabled>Нет в наличии</button>`;
   if (!q) return `<button class="add-btn ${size.includes('primary') ? 'add-btn--primary' : ''}" data-add="${p.id}">+ В корзину</button>`;
   return `<div class="stepper ${size}">
     <button data-dec="${p.id}" aria-label="Меньше">${svgI('minus', 16)}</button>
-    <span>${fmtQty(p, q)}</span>
-    <button data-inc="${p.id}" aria-label="Больше" ${q + stepOf(p) > s ? 'disabled' : ''}>${svgI('plus', 16)}</button>
+    <span>${p.kg ? fmtQty(p, q) : q}</span>
+    <button data-inc="${p.id}" aria-label="Больше" ${q + stepOf(p) > maxOf(p) ? 'disabled' : ''}>${svgI('plus', 16)}</button>
   </div>`;
 }
 function tagsHTML(p) {
@@ -139,14 +143,15 @@ function cardHTML(p) {
       <span class="price">${rubP(p.price)}</span>${p.oldPrice > p.price ? `<span class="price-old">${rubP(p.oldPrice)}</span>` : ''}
     </div>
     <div class="card__name" data-open="${p.id}" title="${esc(p.name)}">${esc(p.name)}</div>
-    <div class="card__unit"><span>${p.unit}</span>${s > 0 && s <= 5 ? `<span class="card__low">осталось ${s}</span>` : ''}</div>
+    <div class="card__unit"><span>${p.unit}</span>${s > 0 && s <= 5 ? `<span class="card__low">осталось ${fmtQty(p, s)}</span>` : ''}</div>
   </article>`;
 }
 function kgPickHTML(p) {
-  const q = state.cart[p.id] || 0, s = stockOf(p);
-  const opts = [0.5, 1, 1.5, 2].filter(v => v <= s);
+  const q = state.cart[p.id] || 0;
+  const opts = [0.5, 1, 1.5, 2].filter(v => v <= maxOf(p));
   return `<div class="kgpick__opts">${opts.map(v => `<button class="${q === v ? 'on' : ''}" data-kg="${p.id}:${v}">${fmtQty(p, v)}</button>`).join('')}</div>
-    <div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>${rubP(Math.round(p.price * q))}</b>` : `Выберите вес · ${rubP(p.price)} за 1 кг`}</div>`;
+    <div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>≈ ${rubP(Math.round(p.price * q))}</b>` : `Выберите вес · ${rubP(p.price)} за 1 кг`}</div>
+    <div class="kgpick__note">${WEIGHT_NOTE}</div>`;
 }
 function refreshQty(id) {
   $$(`[data-action-for="${id}"]`).forEach(el => { el.innerHTML = actionHTML(byId[id], el.dataset.size || ''); });
@@ -535,7 +540,7 @@ function renderFavorites() {
       <div class="toolbar__controls">${sortSelect('favSort', state.favSort, `<option value="added" ${state.favSort === 'added' ? 'selected' : ''}>Недавно добавленные</option>`)}</div>
     </div>
     <div class="fav-summary">
-      <span>В наличии${state.point ? ` на складе <b>${point().city}</b>` : ''}: <b>${avail.length} из ${items.length}</b> · по 1 шт. на <b>${rub(sum)}</b></span>
+      <span>В наличии${state.point ? ` на складе <b>${point().city}</b>` : ''}: <b>${avail.length} из ${items.length}</b> · по 1 шт. (весовые — по 1 кг) на <b>${rub(sum)}</b></span>
       <div class="page-actions">
         <button class="btn btn--ghost btn--sm" data-action="clear-favs">Очистить</button>
         <button class="btn btn--primary btn--sm" data-action="favs-to-cart" ${avail.length ? '' : 'disabled'}>Всё в корзину</button>
@@ -683,8 +688,8 @@ function cartHTML() {
           <div>
             <div class="cart-item__name">${esc(l.p.name)}</div>
             <div class="cart-item__meta">${rubP(l.p.price)}${l.p.kg ? ' / кг' : ''}</div>
-            ${l.ok ? `<div class="cart-item__price">${rubP(l.sum)}</div>`
-              : `<div class="cart-item__warn">${l.avail ? `Осталось ${l.avail} шт` : 'Нет в наличии'}</div>`}
+            ${l.ok ? `<div class="cart-item__price">${l.p.kg ? "≈ " : ""}${rubP(l.sum)}</div>`
+              : `<div class="cart-item__warn">${l.avail ? `Осталось ${fmtQty(l.p, l.avail)}` : 'Нет в наличии'}</div>`}
           </div>
           <div data-action-for="${l.p.id}" data-size="stepper--sm stepper--soft">${l.avail ? actionHTML(l.p, 'stepper--sm stepper--soft') : `<button class="cart__clear" data-remove="${l.p.id}">Удалить</button>`}</div>
         </div>`).join('')}
@@ -695,6 +700,7 @@ function cartHTML() {
         <div class="totals__row"><span>${t.isPickup ? 'Самовывоз' : 'Доставка'}</span><b>${t.delivery ? rub(t.delivery) : 'Бесплатно'}</b></div>
         <div class="totals__row totals__row--total"><span>Итого</span><b>${rub(t.total)}</b></div>
       </div>
+      ${t.okLines.some(l => l.p.kg) ? `<div class="weight-note">${WEIGHT_NOTE}</div>` : ''}
       ${!t.minOk ? `<div class="warn-box">Минимальный заказ ${rub(t.pt.minOrder)}, не хватает ${rub(t.pt.minOrder - t.subtotal)}</div>` : ''}
       <button class="btn btn--primary btn--block btn--between" data-action="checkout" ${t.minOk && t.okLines.length ? '' : 'disabled'}><span>Оформить</span><span>${rub(t.total)}</span></button>
     </div>
@@ -727,9 +733,9 @@ function openProduct(id) {
         </div>
         <div class="pm__stock">
           ${p.offers.map((o, i) => `<div class="pm__stock-row ${i === 0 ? 'current' : ''}"><span>${esc(STORES[o[0]].name)}</span><b>${rubP(o[2])}${i === 0 && p.offers.length > 1 ? ' · дешевле' : ''}</b></div>`).join('')}
-          <div class="pm__stock-row"><span>Наличие</span><b>${s ? (s > 20 ? 'В наличии' : `${s} ${p.kg ? 'кг' : 'шт'}`) : 'Нет'}</b></div>
+          <div class="pm__stock-row"><span>Наличие</span><b>${s ? (s > 20 ? 'В наличии' : fmtQty(p, s)) : 'Нет'}</b></div>
         </div>
-        ${p.kg && s ? `<div class="kgpick" data-kg-for="${p.id}">${kgPickHTML(p)}</div>` : ''}
+        ${p.kg && maxOf(p) ? `<div class="kgpick" data-kg-for="${p.id}">${kgPickHTML(p)}</div>` : ''}
         <div class="pm__buy">
           <div>
             <div class="price">${rubP(p.price)}</div>${p.oldPrice > p.price ? `<div class="price-old">${rubP(p.oldPrice)}</div>` : ''}
@@ -825,8 +831,9 @@ function openCheckout() {
       <div class="checkout__side"><div class="checkout__side-inner">
         <div style="font-weight:800;font-size:18px">Ваш заказ</div>
         <div class="summary-items">
-          ${t.okLines.map(l => `<div class="summary-item"><span class="summary-item__img" style="background:${l.p.img ? '#fff' : catById[l.p.cat].color}">${pic(l.p)}</span><span class="summary-item__name">${esc(l.p.name)}</span><span>${l.p.kg ? fmtQty(l.p, l.qty) : '×' + l.qty}</span><b>${rubP(l.sum)}</b></div>`).join('')}
+          ${t.okLines.map(l => `<div class="summary-item"><span class="summary-item__img" style="background:${l.p.img ? '#fff' : catById[l.p.cat].color}">${pic(l.p)}</span><span class="summary-item__name">${esc(l.p.name)}</span><span>${l.p.kg ? fmtQty(l.p, l.qty) : '×' + l.qty}</span><b>${l.p.kg ? '≈ ' : ''}${rubP(l.sum)}</b></div>`).join('')}
         </div>
+        ${t.okLines.some(l => l.p.kg) ? `<div class="weight-note">${WEIGHT_NOTE}</div>` : ''}
         <div class="totals" id="checkoutTotals"></div>
         <button class="btn btn--primary btn--block btn--between" type="submit" id="payBtn"></button>
       </div></div>
@@ -970,8 +977,8 @@ function repeatOrder(id) {
   let missing = 0;
   o.items.forEach(i => {
     if (!byId[i.id]) { missing++; return; }
-    const s = stockOf(byId[i.id]);
-    const q = Math.min(s, (state.cart[i.id] || 0) + i.qty);
+    const s = maxOf(byId[i.id]);
+    const q = Math.min(s, stepQty(byId[i.id], (state.cart[i.id] || 0) + i.qty));
     if (q > 0) state.cart[i.id] = q;
     if (s < i.qty) missing++;
   });
@@ -1100,7 +1107,7 @@ document.addEventListener('click', e => {
     }
     if (a === 'favs-to-cart') {
       let n = 0;
-      state.favs.forEach(id => { const p = byId[id]; if (p && stockOf(p) > 0 && !state.cart[id]) { state.cart[id] = 1; n++; } });
+      state.favs.forEach(id => { const p = byId[id]; if (p && maxOf(p) > 0 && !state.cart[id]) { state.cart[id] = firstOf(p); n++; } });
       save(); renderAll();
       toast(n ? `Добавлено ${n} ${plural(n, 'товар', 'товара', 'товаров')}` : 'Всё уже в корзине');
     }

@@ -817,3 +817,7 @@ html { background: var(--bg); }
 .kgpick__sum { font-size: 14.5px; color: var(--text-2); }
 .kgpick__sum b { color: var(--text); }
 .stepper--round span { min-width: 20px; white-space: nowrap; padding: 0 2px; }
+
+.kgpick__note, .weight-note { font-size: 12.5px; line-height: 1.4; color: var(--text-3); }
+.weight-note { padding: 10px 12px; margin: 0 0 12px; border-radius: 12px; background: var(--surface-2); }
+.cart-page .weight-note { background: var(--surface); }
