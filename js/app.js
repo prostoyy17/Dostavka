@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794766097';
+const BUILD = '1794766149';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -372,8 +372,8 @@ function renderSettings() {
 }
 // Переключатель «Частный дом / Квартира-офис»: плашка плавно переезжает, потом меняются поля
 const kindSwitch = flat => `<div class="kindsw" data-k="${flat ? 'flat' : 'house'}">
-  <button type="button" class="${flat ? '' : 'on'}" data-kind="house">${svgI('home2', 20)}Частный дом</button>
-  <button type="button" class="${flat ? 'on' : ''}" data-kind="flat">${svgI('flat', 20)}Квартира / офис</button>
+  <button type="button" class="${flat ? '' : 'on'}" data-kind="house">Частный дом</button>
+  <button type="button" class="${flat ? 'on' : ''}" data-kind="flat">Квартира / Офис</button>
 </div>`;
 const slideKind = (btn, then) => {
   const sw = btn.closest('.kindsw'); sw.dataset.k = btn.dataset.kind;
@@ -391,7 +391,7 @@ function renderAddress() {
         <div class="field"><input name="street" placeholder=" " value="${esc([f.street, f.house].filter(Boolean).join(', '))}" autocomplete="street-address"><label>Улица и дом</label></div>
         ${flat ? `
         <div class="row row--2" style="grid-template-columns:1fr 1fr">
-          <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Квартира / офис</label></div>
+          <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Квартира / Офис</label></div>
           <div class="field"><input name="entrance" placeholder=" " inputmode="numeric" value="${esc(f.entrance || '')}"><label>Подъезд</label></div>
         </div>
         <div class="row row--2" style="grid-template-columns:1fr 1fr">
@@ -814,7 +814,7 @@ function openCheckout() {
           <div class="field"><input name="street" placeholder=" " value="${esc([f.street, f.house].filter(Boolean).join(', '))}" autocomplete="street-address"><label>Улица и дом</label></div>
           ${flat ? `
           <div class="row row--2" style="grid-template-columns:1fr 1fr">
-            <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Квартира / офис</label></div>
+            <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Квартира / Офис</label></div>
             <div class="field"><input name="entrance" placeholder=" " inputmode="numeric" value="${esc(f.entrance || '')}"><label>Подъезд</label></div>
           </div>
           <div class="row row--2" style="grid-template-columns:1fr 1fr">
