@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794736242';
+const BUILD = '1794736552';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -336,7 +336,7 @@ function addGap() { $('#page').insertAdjacentHTML('afterbegin', '<div class="tab
 function addBack() { $('#page').insertAdjacentHTML('afterbegin', backBar()); }
 function addressText() {
   const a = state.address || {};
-  return a.street ? `${a.street}, ${a.house || ''}${a.apt ? ', кв. ' + a.apt : ''}` : 'Не указан';
+  return a.street ? [a.street, a.house, a.apt && 'кв. ' + a.apt].filter(Boolean).join(', ') : 'Не указан';
 }
 function renderAccount() {
   $('#page').innerHTML = `
@@ -374,10 +374,9 @@ function renderAddress() {
     <div class="acc">
       <h1 class="acc__title">Адрес доставки</h1>
       <form class="acc__form" id="addrForm" novalidate>
-        <div class="field"><input name="street" placeholder=" " value="${esc(f.street || '')}"><label>Улица</label></div>
-        <div class="row row--3">
-          <div class="field"><input name="house" placeholder=" " value="${esc(f.house || '')}"><label>Дом</label></div>
-          <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Кв./офис</label></div>
+        <div class="field"><input name="street" placeholder=" " value="${esc([f.street, f.house].filter(Boolean).join(', '))}"><label>Улица и дом</label></div>
+        <div class="row row--2">
+          <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Кв./офис (если есть)</label></div>
           <div class="field"><input name="entrance" placeholder=" " value="${esc(f.entrance || '')}"><label>Подъезд</label></div>
         </div>
         <div class="row row--2">
@@ -390,8 +389,8 @@ function renderAddress() {
   $('#addrForm').onsubmit = e => {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.target));
-    if (!d.street.trim() || !d.house.trim()) { toast('Укажите улицу и дом'); return; }
-    state.address = { ...state.address, ...d };
+    if (!/\d/.test(d.street)) { toast('Укажите улицу и номер дома'); return; }
+    state.address = { ...state.address, ...d, street: d.street.trim(), house: '', kind: d.apt?.trim() ? 'flat' : 'house' };
     LS.set('address', state.address);
     renderPoint();
     toast('Адрес сохранён');
@@ -619,7 +618,7 @@ function renderPoint() {
   const open = pt ? isOpen(pt) : false;
   $('#pointDot').classList.toggle('off', !open);
   $('#pointMeta').textContent = pt
-    ? (state.address.street ? `${state.address.street}, ${state.address.house || ''}` : (open ? `Сегодня до ${pad2(pt.hours[1])}:00 · ${pt.eta}` : `${opensToday(pt) ? 'Сегодня' : 'Завтра'} с ${pad2(pt.hours[0])}:00`))
+    ? (state.address.street ? [state.address.street, state.address.house].filter(Boolean).join(', ') : (open ? `Сегодня до ${pad2(pt.hours[1])}:00 · ${pt.eta}` : `${opensToday(pt) ? 'Сегодня' : 'Завтра'} с ${pad2(pt.hours[0])}:00`))
     : 'Грозный';
 }
 
@@ -786,22 +785,17 @@ function openCheckout() {
             <button type="button" class="${flat ? '' : 'on'}" data-kind="house">Частный дом</button>
             <button type="button" class="${flat ? 'on' : ''}" data-kind="flat">Квартира / офис</button>
           </div>
-          <div class="field"><input name="street" placeholder=" " value="${esc(f.street || '')}" autocomplete="address-line1"><label>Улица</label></div>
+          <div class="field"><input name="street" placeholder=" " value="${esc([f.street, f.house].filter(Boolean).join(', '))}" autocomplete="street-address"><label>Улица и дом</label></div>
           ${flat ? `
           <div class="row row--2" style="grid-template-columns:1fr 1fr">
-            <div class="field"><input name="house" placeholder=" " value="${esc(f.house || '')}"><label>Дом</label></div>
             <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Квартира / офис</label></div>
-          </div>
-          <div class="row row--3" style="grid-template-columns:1fr 1fr 1fr">
             <div class="field"><input name="entrance" placeholder=" " inputmode="numeric" value="${esc(f.entrance || '')}"><label>Подъезд</label></div>
+          </div>
+          <div class="row row--2" style="grid-template-columns:1fr 1fr">
             <div class="field"><input name="floor" placeholder=" " inputmode="numeric" value="${esc(f.floor || '')}"><label>Этаж</label></div>
             <div class="field"><input name="code" placeholder=" " value="${esc(f.code || '')}"><label>Домофон</label></div>
-          </div>
-          <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>` : `
-          <div class="row row--2" style="grid-template-columns:1fr 1fr">
-            <div class="field"><input name="house" placeholder=" " value="${esc(f.house || '')}"><label>Дом</label></div>
-            <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
-          </div>`}
+          </div>` : ''}
+          <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
           <div class="field"><textarea name="comment" placeholder=" "></textarea><label>Комментарий курьеру</label></div>
           <div class="photos">
             <div class="photos__title">Фото дома или входа <span>до 3 фото, по желанию</span></div>
@@ -892,7 +886,7 @@ function openCheckout() {
     const kd = e.target.closest('[data-kind]');
     if (kd && kd.dataset.kind !== (f.kind || 'house')) {
       const d = Object.fromEntries(new FormData(form));
-      ['street', 'house', 'apt', 'entrance', 'floor', 'code', 'zone', 'name', 'phone'].forEach(k => { if (d[k] !== undefined) state.address[k] = d[k]; });
+      ['street', 'apt', 'entrance', 'floor', 'code', 'zone', 'name', 'phone'].forEach(k => { if (d[k] !== undefined) state.address[k] = d[k]; }); state.address.house = '';
       state.address.kind = kd.dataset.kind;
       const keepComment = d.comment;
       openCheckout(); if (keepComment) $('#checkoutForm [name=comment]').value = keepComment;
@@ -928,7 +922,7 @@ function openCheckout() {
       if (fld) { fld.classList.add('error'); if (!fld.querySelector('.field__err')) fld.insertAdjacentHTML('beforeend', `<div class="field__err">${msg}</div>`); }
       else el.classList.add('bad');
     };
-    if (!pickup) { if (!data.street?.trim()) err('street', 'Укажите улицу'); if (!data.house?.trim()) err('house', 'Укажите дом'); if (flat && !data.apt?.trim()) err('apt', 'Укажите квартиру'); }
+    if (!pickup) { if (!data.street?.trim()) err('street', 'Укажите улицу и дом'); else if (!/\d/.test(data.street)) err('street', 'Добавьте номер дома, например: Кадырова, 12'); if (flat && !data.apt?.trim()) err('apt', 'Укажите квартиру'); }
     if (!data.name?.trim()) err('name', 'Укажите имя');
     if ((data.phone || '').replace(/\D/g, '').length !== 11) err('phone', 'Номер полностью');
     if (f.pay === 'card') {
@@ -938,7 +932,7 @@ function openCheckout() {
     }
     if (first) { first.focus(); toast('Проверьте поля'); return; }
 
-    state.address = { ...state.address, kind: flat ? 'flat' : 'house', name: data.name, phone: data.phone, ...(pickup ? {} : { street: data.street, house: data.house, apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
+    state.address = { ...state.address, kind: flat ? 'flat' : 'house', name: data.name, phone: data.phone, ...(pickup ? {} : { street: data.street.trim(), house: '', apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
     LS.set('address', state.address);
     placeOrder({ ...f, ...data, pickup, kind: flat ? 'flat' : 'house' });
   };
@@ -999,7 +993,7 @@ function placeOrder(f) {
     id, createdAt: Date.now(), point: state.point, mode: f.pickup ? 'pickup' : 'delivery', via: 'wa',
     items: t.okLines.map(l => ({ id: l.p.id, name: l.p.name, qty: l.qty, price: l.p.price, offers: l.p.offers })),
     total: t.total + (f.pickup ? 0 : f.tip), pay: f.pay, slot: f.slot,
-    address: f.pickup ? 'Самовывоз' : `${f.street}, ${f.house}${f.kind === 'flat' && f.apt ? ', кв. ' + f.apt : ''}`
+    address: f.pickup ? 'Самовывоз' : `${f.street.trim()}${f.kind === 'flat' && f.apt ? ', кв. ' + f.apt : ''}`
   };
   order.text = orderMessage(order, f, t);
   sentPhotos = orderPhotos.map(ph => ph.file); orderPhotos = [];
