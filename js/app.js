@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794734243';
+const BUILD = '1794735978';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -778,10 +778,6 @@ function openCheckout() {
     <form class="checkout" id="checkoutForm" novalidate>
       <div class="checkout__form">
         <h2 class="checkout__title">Оформление заказа</h2>
-        <div class="modesw">
-          <button type="button" class="${pickup ? '' : 'on'}" data-mode-sw="delivery">Доставка</button>
-          <button type="button" class="${pickup ? 'on' : ''}" data-mode-sw="pickup">Самовывоз</button>
-        </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">1</span>${pickup ? 'Самовывоз' : 'Адрес доставки'} · ${pt.city}</div>
           ${pickup ? `<div class="pickup-box">${svgI('store', 26)}<div><b>Заберёте заказ сами</b><div style="font-size:13px;color:var(--text-2)">Адрес и время выдачи пришлём в WhatsApp, когда соберём заказ</div></div></div>` : `
@@ -796,7 +792,7 @@ function openCheckout() {
             <div class="field"><input name="code" placeholder=" " value="${f.code || ''}"><label>Домофон</label></div>
             <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
           </div>
-          <div class="field"><textarea name="landmark" placeholder=" ">${esc(f.landmark || '')}</textarea><label>Как найти: ориентир, цвет ворот, подъезд</label></div>
+          <div class="field"><textarea name="comment" placeholder=" "></textarea><label>Комментарий курьеру</label></div>
           <div class="checkout__hint">Фото дома или точку на карте можно отправить в WhatsApp вместе с заказом</div>`}
         </div>
         <div class="fieldset">
@@ -805,7 +801,6 @@ function openCheckout() {
             <div class="field"><input name="name" placeholder=" " value="${f.name || ''}" autocomplete="given-name"><label>Имя</label></div>
             <div class="field"><input name="phone" type="tel" placeholder=" " value="${f.phone || ''}" autocomplete="tel"><label>Телефон</label></div>
           </div>
-          <div class="field"><textarea name="comment" placeholder=" "></textarea><label>Комментарий${pickup ? '' : ' курьеру'}</label></div>
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">3</span>Время</div>
@@ -814,7 +809,7 @@ function openCheckout() {
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">4</span>Оплата</div>
           <div class="opts">
-            ${[['sbp', 'qr', 'СБП', 'После подтверждения заказа'], ['courier-card', 'terminal', pickup ? 'Картой при получении' : 'Картой курьеру', 'Терминал'], ['cash', 'cash', 'Наличными', 'При получении']]
+            ${[['sbp', 'qr', 'СБП', 'После подтверждения заказа'], ['cash', 'cash', 'Наличными', 'При получении']]
               .map(([id, icon, ti, su]) => `<button type="button" class="opt ${f.pay === id ? 'active' : ''}" data-pay="${id}">${svgI(icon, 24)}<span class="opt__title">${ti}</span><span class="opt__sub">${su}</span></button>`).join('')}
           </div>
           <div id="payExtra"></div>
@@ -828,8 +823,6 @@ function openCheckout() {
             <option value="similar">Заменить на похожий</option>
             <option value="remove">Убрать из заказа</option>
           </select><label>Если товара не окажется</label></div>
-          ${pickup ? '' : `<div style="font-weight:600;font-size:14px">Чаевые курьеру</div>
-          <div class="slots">${[0, 50, 100, 150, 200].map(v => `<button type="button" class="slot ${f.tip === v ? 'active' : ''}" data-tip="${v}">${v ? rub(v) : 'Без чаевых'}</button>`).join('')}</div>`}
         </div>
       </div>
       <div class="checkout__side"><div class="checkout__side-inner">
@@ -908,7 +901,7 @@ function openCheckout() {
     }
     if (first) { first.focus(); toast('Проверьте поля'); return; }
 
-    state.address = { ...state.address, name: data.name, phone: data.phone, ...(pickup ? {} : { street: data.street, house: data.house, apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone, landmark: data.landmark }) };
+    state.address = { ...state.address, name: data.name, phone: data.phone, ...(pickup ? {} : { street: data.street, house: data.house, apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
     LS.set('address', state.address);
     placeOrder({ ...f, ...data, pickup });
   };
@@ -938,7 +931,6 @@ function orderMessage(o, f, t) {
     L.push(`Доставка: ${o.address}${f.zone ? ` (${f.zone})` : ''}`);
     const extra = [f.entrance && `подъезд ${f.entrance}`, f.floor && `этаж ${f.floor}`, f.code && `домофон ${f.code}`].filter(Boolean).join(', ');
     if (extra) L.push(extra);
-    if (f.landmark?.trim()) L.push(`Как найти: ${f.landmark.trim()}`);
     if (f.leave) L.push('Оставить у двери');
     if (f.noCall) L.push('Не звонить в домофон');
   }
