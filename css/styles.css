@@ -907,3 +907,9 @@ body.sticky-header .layout { padding-top: 16px; }
   body.sheet-full .overlay { background: var(--surface) !important; }
   .modal.modal--full { min-height: 100vh; min-height: 100lvh; }
 }
+/* оформление как обычная страница */
+.checkout--page { background: var(--surface); border-radius: 24px; overflow: hidden; }
+@media (max-width: 760px) {
+  .checkout--page { margin: 0 -16px; border-radius: 24px 24px 0 0; }
+  .checkout--page .checkout__side { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+}

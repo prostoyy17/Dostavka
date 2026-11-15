@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794736666';
+const BUILD = '1794736936';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -165,7 +165,7 @@ function syncFav(id) {
 /* ================= Router ================= */
 function parseRoute() {
   const h = location.hash.replace(/^#\/?/, '');
-  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart', 'login'].find(r => h.startsWith(r)) || 'catalog';
+  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart', 'login', 'checkout'].find(r => h.startsWith(r)) || 'catalog';
 }
 /* Память прокрутки: у каждого экрана (и у каждого раздела каталога) своя позиция.
    Ушёл с главной в «Избранное» и вернулся — главная открывается там же, где была. */
@@ -187,10 +187,10 @@ function restoreScroll() {
 window.addEventListener('hashchange', () => { rememberScroll(); parseRoute(); closeAll(); renderPage(); restoreScroll(); });
 
 function renderPage() {
-  const navOf = { address: 'account', about: 'account', settings: 'account', orders: 'account', login: 'account' };
+  const navOf = { address: 'account', about: 'account', settings: 'account', orders: 'account', login: 'account', checkout: 'cart' };
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (navOf[state.route] || state.route)));
   document.body.classList.toggle('sub', state.route !== 'catalog');
-  document.body.classList.toggle('no-tabbar', state.route === 'login');
+  document.body.classList.toggle('no-tabbar', state.route === 'login' || state.route === 'checkout');
   renderCats();
   if (state.route === 'favorites') { renderFavorites(); return addGap(); }
   if (state.route === 'orders') { renderOrders(); return addBack(); }
@@ -199,6 +199,7 @@ function renderPage() {
   if (state.route === 'address') return renderAddress();
   if (state.route === 'about') return renderAbout();
   if (state.route === 'settings') return renderSettings();
+  if (state.route === 'checkout') return openCheckout();
   if (state.route === 'login') { renderAuth(); return addBack(); }
   renderCatalogPage();
 }
@@ -764,20 +765,18 @@ function timeSlots() {
   return slots;
 }
 
+// Оформление — обычная отдельная страница (#/checkout), а не всплывающее окно:
+// прокручивается как страница, Safari сам правильно обрабатывает свои панели сверху и снизу.
 function openCheckout() {
+  if (state.route !== 'checkout') { location.hash = '#/checkout'; return; }
   const t = totals();
-  if (!t.minOk || !t.okLines.length) return;
+  if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
   const f = { slot: 'asap', pay: 'sbp', tip: 0, ...state.address };
   const flat = f.kind === 'flat';   // тип адреса: частный дом или квартира/офис
   const pt = t.pt, pickup = t.isPickup;
-  const m = $('#modal');
-  m.className = 'modal modal--wide modal--full show';
-  showOverlay();
-  document.body.classList.add('sheet-full');
-  const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();   // Safari красит полосы сверху и снизу в цвет страницы — делаем её цвета окна
-  m.innerHTML = `
-    <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
-    <form class="checkout" id="checkoutForm" novalidate>
+  const m = $('#page');
+  m.innerHTML = `${backBar()}
+    <form class="checkout checkout--page" id="checkoutForm" novalidate>
       <div class="checkout__form">
         <h2 class="checkout__title">Оформление заказа</h2>
         <div class="fieldset">
@@ -845,7 +844,6 @@ function openCheckout() {
         <button class="btn btn--primary btn--block btn--between" type="submit" id="payBtn"></button>
       </div></div>
     </form>`;
-  m.scrollTop = 0;
 
   const form = $('#checkoutForm');
   const drawTotals = () => {
@@ -1003,8 +1001,9 @@ function placeOrder(f) {
   const win = window.open(url, '_blank');   // в обработчике нажатия — браузер разрешает
   state.orders.unshift(order);
   t.okLines.forEach(l => delete state.cart[l.p.id]);
-  save(); renderAll();
-  openTracking(order.id);
+  save();
+  location.hash = '#/orders';
+  setTimeout(() => openTracking(order.id), 60);
   if (!win) location.href = url;
 }
 
@@ -1107,8 +1106,6 @@ function closeAll() {
   $('#modal').classList.remove('show');
   $('#modal').onclick = null;
   $('#overlay').classList.remove('show');
-  document.body.classList.remove('sheet-full');
-  applyTheme();
   unlockScroll('overlay');
   clearInterval(trackTimer);
 }
