@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794765638';
+const BUILD = '1794765710';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -372,27 +372,44 @@ function renderSettings() {
 }
 function renderAddress() {
   const f = state.address || {};
+  const flat = f.kind === 'flat', pt = POINTS[0];
   $('#page').innerHTML = `${backBar()}
     <div class="acc">
       <h1 class="acc__title">Адрес доставки</h1>
       <form class="acc__form" id="addrForm" novalidate>
-        <div class="field"><input name="street" placeholder=" " value="${esc([f.street, f.house].filter(Boolean).join(', '))}"><label>Улица и дом</label></div>
-        <div class="row row--2">
-          <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Кв./офис (если есть)</label></div>
-          <div class="field"><input name="entrance" placeholder=" " value="${esc(f.entrance || '')}"><label>Подъезд</label></div>
+        <div class="kindsw">
+          <button type="button" class="${flat ? '' : 'on'}" data-kind="house">Частный дом</button>
+          <button type="button" class="${flat ? 'on' : ''}" data-kind="flat">Квартира / офис</button>
         </div>
-        <div class="row row--2">
-          <div class="field"><input name="floor" placeholder=" " value="${esc(f.floor || '')}"><label>Этаж</label></div>
+        <div class="field"><input name="street" placeholder=" " value="${esc([f.street, f.house].filter(Boolean).join(', '))}" autocomplete="street-address"><label>Улица и дом</label></div>
+        ${flat ? `
+        <div class="row row--2" style="grid-template-columns:1fr 1fr">
+          <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Квартира / офис</label></div>
+          <div class="field"><input name="entrance" placeholder=" " inputmode="numeric" value="${esc(f.entrance || '')}"><label>Подъезд</label></div>
+        </div>
+        <div class="row row--2" style="grid-template-columns:1fr 1fr">
+          <div class="field"><input name="floor" placeholder=" " inputmode="numeric" value="${esc(f.floor || '')}"><label>Этаж</label></div>
           <div class="field"><input name="code" placeholder=" " value="${esc(f.code || '')}"><label>Домофон</label></div>
-        </div>
+        </div>` : ''}
+        <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
         <button class="acc__login acc__save" type="submit">Сохранить</button>
       </form>
     </div>`;
-  $('#addrForm').onsubmit = e => {
+  const form = $('#addrForm');
+  form.onclick = e => {
+    const kd = e.target.closest('[data-kind]');
+    if (!kd || kd.dataset.kind === (f.kind || 'house')) return;
+    const d = Object.fromEntries(new FormData(form));
+    state.address = { ...state.address, ...d, house: '', kind: kd.dataset.kind };
+    renderAddress();
+  };
+  form.onsubmit = e => {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.target));
-    if (!/\d/.test(d.street)) { toast('Укажите улицу и номер дома'); return; }
-    state.address = { ...state.address, ...d, street: d.street.trim(), house: '', kind: d.apt?.trim() ? 'flat' : 'house' };
+    if (!/\d/.test(d.street)) { toast('Укажите улицу и номер дома, например: Кадырова, 12'); return; }
+    if (flat && !d.apt?.trim()) { toast('Укажите квартиру'); return; }
+    state.address = { ...state.address, ...d, street: d.street.trim(), house: '', kind: flat ? 'flat' : 'house' };
+    if (!flat) Object.assign(state.address, { apt: '', entrance: '', floor: '', code: '' });
     LS.set('address', state.address);
     renderPoint();
     toast('Адрес сохранён');
