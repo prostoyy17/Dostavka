@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794736552';
+const BUILD = '1794736666';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -773,6 +773,8 @@ function openCheckout() {
   const m = $('#modal');
   m.className = 'modal modal--wide modal--full show';
   showOverlay();
+  document.body.classList.add('sheet-full');
+  const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();   // Safari красит полосы сверху и снизу в цвет страницы — делаем её цвета окна
   m.innerHTML = `
     <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
     <form class="checkout" id="checkoutForm" novalidate>
@@ -1105,6 +1107,8 @@ function closeAll() {
   $('#modal').classList.remove('show');
   $('#modal').onclick = null;
   $('#overlay').classList.remove('show');
+  document.body.classList.remove('sheet-full');
+  applyTheme();
   unlockScroll('overlay');
   clearInterval(trackTimer);
 }
