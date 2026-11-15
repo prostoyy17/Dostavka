@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794765516';
+const BUILD = '1794765638';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -773,6 +773,8 @@ function openCheckout() {
   const t = totals();
   if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
   const f = { slot: 'asap', pay: 'sbp', tip: 0, ...state.address };
+  // имя и телефон из аккаунта, если в заказах их ещё не вводили
+  if (state.user) { if (!f.name) f.name = state.user.name || ''; if (!f.phone) f.phone = state.user.phone || ''; }
   const flat = f.kind === 'flat';   // тип адреса: частный дом или квартира/офис
   const pt = t.pt, pickup = t.isPickup;
   const m = $('#page');
