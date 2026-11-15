@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794765350';
+const BUILD = '1794765516';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -997,10 +997,7 @@ function orderMessage(o, f, t, withFiles) {
   if (!f.pickup) L.push(`Доставка: ${t.delivery ? rub(t.delivery) : 'бесплатно'}`);
   if (f.tip && !f.pickup) L.push(`Чаевые: ${rub(f.tip)}`);
   L.push(`💰 *ИТОГО: ${kg ? '≈' : ''}${rub(o.total)}*`);
-  if (kg) L.push('_⚖️ весовые товары — сумма после взвешивания_');
-  L.push('');
-  L.push('🖼 *Фото всех товаров:*');
-  L.push(orderViewLink(o));
+  if (!withFiles) { L.push(''); L.push('🖼 *Фото всех товаров:*'); L.push(orderViewLink(o)); }   // только в запасном WhatsApp — там фото не прикрепить
   return L.join('\n');
 }
 
