@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794735978';
+const BUILD = '1794736242';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -769,9 +769,10 @@ function openCheckout() {
   const t = totals();
   if (!t.minOk || !t.okLines.length) return;
   const f = { slot: 'asap', pay: 'sbp', tip: 0, ...state.address };
+  const flat = f.kind === 'flat';   // тип адреса: частный дом или квартира/офис
   const pt = t.pt, pickup = t.isPickup;
   const m = $('#modal');
-  m.className = 'modal modal--wide show';
+  m.className = 'modal modal--wide modal--full show';
   showOverlay();
   m.innerHTML = `
     <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
@@ -781,19 +782,32 @@ function openCheckout() {
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">1</span>${pickup ? 'Самовывоз' : 'Адрес доставки'} · ${pt.city}</div>
           ${pickup ? `<div class="pickup-box">${svgI('store', 26)}<div><b>Заберёте заказ сами</b><div style="font-size:13px;color:var(--text-2)">Адрес и время выдачи пришлём в WhatsApp, когда соберём заказ</div></div></div>` : `
-          <div class="row row--3">
-            <div class="field"><input name="street" placeholder=" " value="${f.street || ''}"><label>Улица</label></div>
-            <div class="field"><input name="house" placeholder=" " value="${f.house || ''}"><label>Дом</label></div>
-            <div class="field"><input name="apt" placeholder=" " value="${f.apt || ''}"><label>Кв./офис</label></div>
+          <div class="kindsw">
+            <button type="button" class="${flat ? '' : 'on'}" data-kind="house">Частный дом</button>
+            <button type="button" class="${flat ? 'on' : ''}" data-kind="flat">Квартира / офис</button>
           </div>
-          <div class="row row--4">
-            <div class="field"><input name="entrance" placeholder=" " value="${f.entrance || ''}"><label>Подъезд</label></div>
-            <div class="field"><input name="floor" placeholder=" " value="${f.floor || ''}"><label>Этаж</label></div>
-            <div class="field"><input name="code" placeholder=" " value="${f.code || ''}"><label>Домофон</label></div>
+          <div class="field"><input name="street" placeholder=" " value="${esc(f.street || '')}" autocomplete="address-line1"><label>Улица</label></div>
+          ${flat ? `
+          <div class="row row--2" style="grid-template-columns:1fr 1fr">
+            <div class="field"><input name="house" placeholder=" " value="${esc(f.house || '')}"><label>Дом</label></div>
+            <div class="field"><input name="apt" placeholder=" " value="${esc(f.apt || '')}"><label>Квартира / офис</label></div>
+          </div>
+          <div class="row row--3" style="grid-template-columns:1fr 1fr 1fr">
+            <div class="field"><input name="entrance" placeholder=" " inputmode="numeric" value="${esc(f.entrance || '')}"><label>Подъезд</label></div>
+            <div class="field"><input name="floor" placeholder=" " inputmode="numeric" value="${esc(f.floor || '')}"><label>Этаж</label></div>
+            <div class="field"><input name="code" placeholder=" " value="${esc(f.code || '')}"><label>Домофон</label></div>
+          </div>
+          <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>` : `
+          <div class="row row--2" style="grid-template-columns:1fr 1fr">
+            <div class="field"><input name="house" placeholder=" " value="${esc(f.house || '')}"><label>Дом</label></div>
             <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
-          </div>
+          </div>`}
           <div class="field"><textarea name="comment" placeholder=" "></textarea><label>Комментарий курьеру</label></div>
-          <div class="checkout__hint">Фото дома или точку на карте можно отправить в WhatsApp вместе с заказом</div>`}
+          <div class="photos">
+            <div class="photos__title">Фото дома или входа <span>до 3 фото, по желанию</span></div>
+            <div class="photos__list" id="photoList"></div>
+            <input type="file" id="photoInput" accept="image/*" multiple hidden>
+          </div>`}
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">2</span>Контакты</div>
@@ -856,11 +870,34 @@ function openCheckout() {
       : f.pay === 'cash' ? `<div class="field"><input name="change" inputmode="numeric" placeholder=" "><label>С какой суммы сдача</label></div>` : '';
   };
   drawPay(); drawTotals();
+  // фото дома: до 3 штук, хранятся только в памяти до отправки
+  const drawPhotos = () => {
+    $('#photoList').innerHTML = orderPhotos.map((ph, i) => `<div class="photos__item"><img src="${ph.url}" alt=""><button type="button" data-photo-del="${i}" aria-label="Удалить">${svgI('x', 14)}</button></div>`).join('')
+      + (orderPhotos.length < 3 ? `<button type="button" class="photos__add" data-photo-add>${svgI('plus', 22)}<span>Добавить</span></button>` : '');
+  };
+  drawPhotos();
+  $('#photoInput').onchange = e => {
+    [...e.target.files].slice(0, 3 - orderPhotos.length).forEach(file => orderPhotos.push({ file, url: URL.createObjectURL(file) }));
+    if (e.target.files.length > 3) toast('Можно добавить до 3 фото');
+    e.target.value = ''; drawPhotos();
+  };
 
   form.onclick = e => {
     const s = e.target.closest('[data-slot]'), p = e.target.closest('[data-pay]'), tp = e.target.closest('[data-tip]');
     if (s) { f.slot = s.dataset.slot; $$('[data-slot]', form).forEach(b => b.classList.toggle('active', b === s)); }
     if (p) { f.pay = p.dataset.pay; $$('[data-pay]', form).forEach(b => b.classList.toggle('active', b === p)); drawPay(); drawTotals(); }
+    if (e.target.closest('[data-photo-add]')) { $('#photoInput').click(); return; }
+    const del = e.target.closest('[data-photo-del]');
+    if (del) { const [ph] = orderPhotos.splice(+del.dataset.photoDel, 1); URL.revokeObjectURL(ph.url); drawPhotos(); return; }
+    const kd = e.target.closest('[data-kind]');
+    if (kd && kd.dataset.kind !== (f.kind || 'house')) {
+      const d = Object.fromEntries(new FormData(form));
+      ['street', 'house', 'apt', 'entrance', 'floor', 'code', 'zone', 'name', 'phone'].forEach(k => { if (d[k] !== undefined) state.address[k] = d[k]; });
+      state.address.kind = kd.dataset.kind;
+      const keepComment = d.comment;
+      openCheckout(); if (keepComment) $('#checkoutForm [name=comment]').value = keepComment;
+      return;
+    }
     const sw = e.target.closest('[data-mode-sw]');
     if (sw && sw.dataset.modeSw !== state.mode) {
       const d = Object.fromEntries(new FormData(form));
@@ -891,7 +928,7 @@ function openCheckout() {
       if (fld) { fld.classList.add('error'); if (!fld.querySelector('.field__err')) fld.insertAdjacentHTML('beforeend', `<div class="field__err">${msg}</div>`); }
       else el.classList.add('bad');
     };
-    if (!pickup) { if (!data.street?.trim()) err('street', 'Укажите улицу'); if (!data.house?.trim()) err('house', 'Укажите дом'); }
+    if (!pickup) { if (!data.street?.trim()) err('street', 'Укажите улицу'); if (!data.house?.trim()) err('house', 'Укажите дом'); if (flat && !data.apt?.trim()) err('apt', 'Укажите квартиру'); }
     if (!data.name?.trim()) err('name', 'Укажите имя');
     if ((data.phone || '').replace(/\D/g, '').length !== 11) err('phone', 'Номер полностью');
     if (f.pay === 'card') {
@@ -901,9 +938,9 @@ function openCheckout() {
     }
     if (first) { first.focus(); toast('Проверьте поля'); return; }
 
-    state.address = { ...state.address, name: data.name, phone: data.phone, ...(pickup ? {} : { street: data.street, house: data.house, apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
+    state.address = { ...state.address, kind: flat ? 'flat' : 'house', name: data.name, phone: data.phone, ...(pickup ? {} : { street: data.street, house: data.house, apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
     LS.set('address', state.address);
-    placeOrder({ ...f, ...data, pickup });
+    placeOrder({ ...f, ...data, pickup, kind: flat ? 'flat' : 'house' });
   };
 }
 
@@ -922,13 +959,14 @@ function maskPhone(v) {
 }
 
 // Заказ уходит продавцу в WhatsApp готовым сообщением (без сервера)
+let orderPhotos = [], sentPhotos = [];   // фото дома: в форме и после отправки (для «Отправить фото»)
 function orderMessage(o, f, t) {
   const L = [];
   L.push(`*Новый заказ №${o.id}*`);
   L.push(`${f.name}, ${f.phone}`);
   if (f.pickup) L.push('Самовывоз');
   else {
-    L.push(`Доставка: ${o.address}${f.zone ? ` (${f.zone})` : ''}`);
+    L.push(`Доставка (${f.kind === 'flat' ? 'квартира/офис' : 'частный дом'}): ${o.address}${f.zone ? ` (${f.zone})` : ''}`);
     const extra = [f.entrance && `подъезд ${f.entrance}`, f.floor && `этаж ${f.floor}`, f.code && `домофон ${f.code}`].filter(Boolean).join(', ');
     if (extra) L.push(extra);
     if (f.leave) L.push('Оставить у двери');
@@ -939,6 +977,7 @@ function orderMessage(o, f, t) {
   L.push(`Оплата: ${payLabel(f.pay)}${f.pay === 'cash' && f.change ? `, сдача с ${f.change} ₽` : ''}`);
   L.push(`Если товара нет: ${({ call: 'позвонить и согласовать', similar: 'заменить на похожий', remove: 'убрать из заказа' })[f.replace] || 'позвонить'}`);
   if (f.comment?.trim()) L.push(`Комментарий: ${f.comment.trim()}`);
+  if (orderPhotos.length) L.push(`Фото дома: ${orderPhotos.length} шт — пришлю следующим сообщением`);
   L.push('');
   L.push('*Товары:*');
   t.okLines.forEach((l, k) => L.push(`${k + 1}. ${l.p.name} — ${fmtQty(l.p, l.qty)} — ${l.p.kg ? '≈' : ''}${rub(l.sum)}`));
@@ -960,9 +999,10 @@ function placeOrder(f) {
     id, createdAt: Date.now(), point: state.point, mode: f.pickup ? 'pickup' : 'delivery', via: 'wa',
     items: t.okLines.map(l => ({ id: l.p.id, name: l.p.name, qty: l.qty, price: l.p.price, offers: l.p.offers })),
     total: t.total + (f.pickup ? 0 : f.tip), pay: f.pay, slot: f.slot,
-    address: f.pickup ? 'Самовывоз' : `${f.street}, ${f.house}${f.apt ? ', кв. ' + f.apt : ''}`
+    address: f.pickup ? 'Самовывоз' : `${f.street}, ${f.house}${f.kind === 'flat' && f.apt ? ', кв. ' + f.apt : ''}`
   };
   order.text = orderMessage(order, f, t);
+  sentPhotos = orderPhotos.map(ph => ph.file); orderPhotos = [];
   const url = waLink(order.text);
   const win = window.open(url, '_blank');   // в обработчике нажатия — браузер разрешает
   state.orders.unshift(order);
@@ -991,7 +1031,9 @@ function openTracking(id) {
           <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
           <div class="totals__row totals__row--total"><span>Сумма</span><b>${rub(o.total)}</b></div>
         </div>
-        <a class="btn btn--primary btn--block wa-open" href="${waLink(o.text || `Заказ №${o.id}`)}" target="_blank" rel="noopener">${svgI('whatsapp', 20)}Открыть WhatsApp ещё раз</a>
+        ${sentPhotos.length && o.id === state.orders[0]?.id ? `<button class="btn btn--primary btn--block wa-open" data-share-photos>${svgI('whatsapp', 20)}Отправить фото дома (${sentPhotos.length})</button>
+        <div class="checkout__hint" style="text-align:center">Выберите WhatsApp, затем чат продавца</div>` : ''}
+        <a class="btn ${sentPhotos.length ? 'btn--ghost' : 'btn--primary'} btn--block ${sentPhotos.length ? '' : 'wa-open'}" style="margin-top:10px" href="${waLink(o.text || `Заказ №${o.id}`)}" target="_blank" rel="noopener">${svgI('whatsapp', 20)}Открыть WhatsApp ещё раз</a>
         <div class="row row--2" style="margin-top:8px">
           <a class="btn btn--ghost" href="#/orders">Мои заказы</a>
           <button class="btn btn--ghost" data-close>Продолжить</button>
@@ -1146,6 +1188,12 @@ document.addEventListener('click', e => {
   if ((x = el('[data-dd]'))) { state.dd = state.dd === x.dataset.dd ? null : x.dataset.dd; return renderControls(); }
 
   if ((x = el('[data-track]'))) return openTracking(x.dataset.track);
+  if (el('[data-share-photos]')) {
+    const files = sentPhotos;
+    if (navigator.canShare && navigator.canShare({ files })) navigator.share({ files, text: `Фото к заказу №${state.orders[0].id}` }).catch(() => {});
+    else toast('Прикрепите фото в чате WhatsApp вручную');
+    return;
+  }
   if ((x = el('[data-repeat]'))) return repeatOrder(x.dataset.repeat);
   if (el('[data-close]')) return closeAll();
 

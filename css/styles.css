@@ -882,3 +882,20 @@ body.sticky-header .layout { padding-top: 16px; }
 .wa-btn { display: inline-flex; align-items: center; gap: 8px; }
 .success__icon--wa { color: #25D366; }
 .wa-open { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 14px; background: #25D366 !important; }
+
+/* оформление заказа: на весь экран, тип адреса, фото */
+@media (max-width: 760px) {
+  .modal.modal--full { top: 0; bottom: 0; max-height: none; height: 100%; border-radius: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); box-shadow: none; }
+  .modal.modal--full .close-x { top: calc(env(safe-area-inset-top) + 12px); }
+}
+.kindsw { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 16px; background: var(--surface-2); margin-bottom: 4px; }
+.kindsw button { height: 44px; border-radius: 12px; font-weight: 700; color: var(--text-3); }
+.kindsw button.on { background: var(--accent); color: #fff; }
+.photos { margin-top: 6px; }
+.photos__title { font-weight: 700; font-size: 14.5px; margin-bottom: 8px; }
+.photos__title span { font-weight: 500; color: var(--text-3); font-size: 13px; margin-left: 4px; }
+.photos__list { display: flex; gap: 10px; }
+.photos__item, .photos__add { width: 88px; height: 88px; border-radius: 16px; flex: none; position: relative; }
+.photos__item img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; }
+.photos__item button { position: absolute; top: -6px; right: -6px; width: 26px; height: 26px; border-radius: 50%; background: var(--text); color: var(--surface); display: grid; place-items: center; }
+.photos__add { border: 2px dashed var(--line); color: var(--text-3); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12.5px; font-weight: 600; background: var(--surface); }
