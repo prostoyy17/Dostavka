@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794738508';
+const BUILD = '1794739137';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -165,7 +165,7 @@ function syncFav(id) {
 /* ================= Router ================= */
 function parseRoute() {
   const h = location.hash.replace(/^#\/?/, '');
-  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart', 'login', 'checkout'].find(r => h.startsWith(r)) || 'catalog';
+  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart', 'login', 'checkout', 'z/'].find(r => h.startsWith(r)) || 'catalog';
 }
 /* Память прокрутки: у каждого экрана (и у каждого раздела каталога) своя позиция.
    Ушёл с главной в «Избранное» и вернулся — главная открывается там же, где была. */
@@ -190,7 +190,7 @@ function renderPage() {
   const navOf = { address: 'account', about: 'account', settings: 'account', orders: 'account', login: 'account', checkout: 'cart' };
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (navOf[state.route] || state.route)));
   document.body.classList.toggle('sub', state.route !== 'catalog');
-  document.body.classList.toggle('no-tabbar', state.route === 'login' || state.route === 'checkout');
+  document.body.classList.toggle('no-tabbar', state.route === 'login' || state.route === 'checkout' || state.route === 'z/');
   renderCats();
   if (state.route === 'favorites') { renderFavorites(); return addGap(); }
   if (state.route === 'orders') { renderOrders(); return addBack(); }
@@ -200,6 +200,7 @@ function renderPage() {
   if (state.route === 'about') return renderAbout();
   if (state.route === 'settings') return renderSettings();
   if (state.route === 'checkout') return openCheckout();
+  if (state.route === 'z/') return renderOrderView();
   if (state.route === 'login') { renderAuth(); return addBack(); }
   renderCatalogPage();
 }
@@ -798,11 +799,11 @@ function openCheckout() {
           </div>` : ''}
           <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
           <div class="field"><textarea name="comment" placeholder=" "></textarea><label>Комментарий курьеру</label></div>
-          <div class="photos">
+          ${HOUSE_PHOTOS ? `<div class="photos">
             <div class="photos__title">Фото дома или входа <span>до 3 фото, по желанию</span></div>
             <div class="photos__list" id="photoList"></div>
             <input type="file" id="photoInput" accept="image/*" multiple hidden>
-          </div>`}
+          </div>` : ''}`}
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">2</span>Контакты</div>
@@ -869,9 +870,9 @@ function openCheckout() {
     $('#photoList').innerHTML = orderPhotos.map((ph, i) => `<div class="photos__item"><img src="${ph.url}" alt=""><button type="button" data-photo-del="${i}" aria-label="Удалить">${svgI('x', 14)}</button></div>`).join('')
       + (orderPhotos.length < 3 ? `<button type="button" class="photos__add" data-photo-add>${svgI('plus', 22)}<span>Добавить</span></button>` : '');
   };
-  drawPhotos();
+  if (HOUSE_PHOTOS) drawPhotos();
   checkoutCard = null; orderCardImage({ total: t.total }, t.okLines).then(file => { checkoutCard = file; });
-  $('#photoInput').onchange = e => {
+  if (HOUSE_PHOTOS) $('#photoInput').onchange = e => {
     [...e.target.files].slice(0, 3 - orderPhotos.length).forEach(file => orderPhotos.push({ file, url: URL.createObjectURL(file) }));
     if (e.target.files.length > 3) toast('Можно добавить до 3 фото');
     e.target.value = ''; drawPhotos();
@@ -954,7 +955,9 @@ function maskPhone(v) {
 }
 
 // Заказ уходит продавцу в WhatsApp готовым сообщением (без сервера)
-let orderPhotos = [], sentPhotos = [], sentCard = null, checkoutCard = null;   // фото дома: в форме и после отправки (для «Отправить фото»)
+let orderPhotos = [], sentPhotos = [], sentCard = null, checkoutCard = null;
+// Фото дома и отправка файлами — включим, когда будет сервер (тогда всё уйдёт одним сообщением автоматически)
+const HOUSE_PHOTOS = false, SHARE_FILES = false;   // фото дома: в форме и после отправки (для «Отправить фото»)
 function orderMessage(o, f, t, withFiles) {
   const L = [], line = '━━━━━━━━━━━━━━';
   const kg = t.okLines.some(l => l.p.kg);
@@ -995,7 +998,9 @@ function orderMessage(o, f, t, withFiles) {
   if (f.tip && !f.pickup) L.push(`Чаевые: ${rub(f.tip)}`);
   L.push(`💰 *ИТОГО: ${kg ? '≈' : ''}${rub(o.total)}*`);
   if (kg) L.push('_⚖️ весовые товары — сумма после взвешивания_');
-  if (!withFiles) { L.push(''); L.push(`🖼 _Фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''} — следующим сообщением_`); }
+  L.push('');
+  L.push('🖼 *Фото всех товаров:*');
+  L.push(orderViewLink(o));
   return L.join('\n');
 }
 
@@ -1031,6 +1036,8 @@ async function orderCardImage(order, lines) {
     return blob ? new File([blob], `zakaz${order.id ? "-" + order.id : ""}.jpg`, { type: 'image/jpeg' }) : null;
   } catch { return null; }   // если какая-то картинка без разрешения — без карточки, только фото дома
 }
+// Ссылка на страницу заказа с фото товаров (в ссылке только товары и количество, без личных данных)
+const orderViewLink = o => `${location.origin}${location.pathname}#/z/${o.id}/${o.items.map(i => `${i.id.slice(1)}:${i.qty}`).join(',')}`;
 const waLink = text => `https://wa.me/${ORDER_WHATSAPP}?text=${encodeURIComponent(text)}`;
 
 /* Отправка заказа.
@@ -1059,7 +1066,7 @@ function placeOrder(f) {
     location.hash = '#/orders';
     setTimeout(() => openTracking(order.id), 60);
   };
-  if (LS.get('waKnown', false) && files.length && navigator.canShare && navigator.canShare({ files })) {
+  if (SHARE_FILES && LS.get('waKnown', false) && files.length && navigator.canShare && navigator.canShare({ files })) {
     sentPhotos = photos; order.text = orderMessage(order, f, t, true);
     navigator.share({ files, text: order.text })
       .then(() => finish(true))
@@ -1071,6 +1078,26 @@ function placeOrder(f) {
   const win = window.open(url, '_blank');   // в обработчике нажатия — браузер разрешает
   finish(false);
   if (!win) location.href = url;
+}
+
+/* ================= Страница заказа с фото (по ссылке из WhatsApp) ================= */
+function renderOrderView() {
+  const [, id = '', list = ''] = location.hash.replace(/^#\/?/, '').split('/');
+  const lines = list.split(',').map(x => x.split(':')).map(([pid, q]) => ({ p: byId['p' + pid], qty: +q })).filter(l => l.p && l.qty > 0);
+  const sum = lines.reduce((a, l) => a + Math.round(l.p.price * l.qty), 0), kg = lines.some(l => l.p.kg);
+  $('#page').innerHTML = `
+    <div class="zv">
+      <div class="zv__head"><h1>Заказ №${esc(id)}</h1><span>${lines.length} поз. · товары ${kg ? '≈' : ''}${rub(sum)}</span></div>
+      ${lines.map((l, k) => `<div class="zv__item">
+        <div class="zv__img">${l.p.imgLarge ? `<img src="${l.p.imgLarge}" alt="" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/${l.p.icon}.webp';this.style.cssText='width:60%;height:60%'">` : ic(l.p.icon, '')}</div>
+        <div class="zv__info">
+          <div class="zv__name"><b>${k + 1}.</b> ${esc(l.p.name)}</div>
+          <div class="zv__qty">${fmtQty(l.p, l.qty)} × ${rubP(l.p.price)}${l.p.kg ? '/кг' : ''}</div>
+          <div class="zv__sum">${l.p.kg ? '≈' : ''}${rub(Math.round(l.p.price * l.qty))}</div>
+          <div class="zv__shop">${esc(STORES[l.p.offers[0][0]].name)}</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
 }
 
 /* ================= Tracking ================= */
@@ -1086,15 +1113,15 @@ function openTracking(id) {
       <div class="success">
         <span class="success__icon success__icon--wa">${svgI('whatsapp', 56)}</span>
         <h2>Заказ №${o.id}</h2>
-        <p>${o.oneStep ? 'Заказ с фото отправлен продавцу в WhatsApp.' : 'Шаг 1: в WhatsApp открылся текст заказа — нажмите там «Отправить». Шаг 2: вернитесь сюда и отправьте фото. В следующий раз всё уйдёт сразу, одним сообщением.'} Продавец подтвердит наличие и пришлёт ${o.pay === 'sbp' ? 'ссылку для оплаты по СБП' : 'время доставки'}.</p>
+        <p>В WhatsApp открылся ваш заказ — нажмите там «Отправить». Продавец подтвердит наличие и пришлёт ${o.pay === 'sbp' ? 'ссылку для оплаты по СБП' : 'время доставки'}.</p>
         <div class="totals" style="margin-top:14px;text-align:left">
           <div class="totals__row"><span>${o.mode === 'pickup' ? 'Получение' : 'Адрес'}</span><b>${esc(o.address)}</b></div>
           <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
           <div class="totals__row totals__row--total"><span>Сумма</span><b>${rub(o.total)}</b></div>
         </div>
-        ${o.id === state.orders[0]?.id && !o.oneStep ? `<button class="btn btn--primary btn--block wa-open" data-share-photos>${svgI('whatsapp', 20)}Шаг 2: отправить фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''}</button>
+        ${SHARE_FILES && o.id === state.orders[0]?.id && !o.oneStep ? `<button class="btn btn--primary btn--block wa-open" data-share-photos>${svgI('whatsapp', 20)}Шаг 2: отправить фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''}</button>
         <div class="checkout__hint" style="text-align:center">Выберите WhatsApp, затем чат продавца</div>` : ''}
-        <a class="btn btn--ghost btn--block wa-again" style="margin-top:10px" href="${waLink(o.text || `Заказ №${o.id}`)}" target="_blank" rel="noopener">${svgI('whatsapp', 20)}Шаг 1 ещё раз: текст заказа</a>
+        <a class="btn btn--ghost btn--block wa-again" style="margin-top:10px" href="${waLink(o.text || `Заказ №${o.id}`)}" target="_blank" rel="noopener">${svgI('whatsapp', 20)}Открыть WhatsApp ещё раз</a>
         <div class="row row--2" style="margin-top:8px">
           <a class="btn btn--ghost" href="#/orders">Мои заказы</a>
           <button class="btn btn--ghost" data-close>Продолжить</button>

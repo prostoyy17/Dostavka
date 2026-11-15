@@ -918,3 +918,17 @@ body.sticky-header .layout { padding-top: 16px; }
 @media (max-width: 760px) { .checkout__side-inner { position: static; } }
 
 .wa-again { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* страница заказа с фото товаров (для продавца) */
+.zv { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
+.zv__head h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
+.zv__head span { color: var(--text-2); font-size: 15px; }
+.zv__item { display: grid; grid-template-columns: 140px 1fr; gap: 14px; background: var(--surface); border-radius: 20px; padding: 12px; }
+.zv__img { width: 140px; height: 140px; border-radius: 14px; background: #fff; display: grid; place-items: center; overflow: hidden; }
+.zv__img img { width: 100%; height: 100%; object-fit: contain; }
+.zv__img .ic, .zv__img img:not([src*="/"]) { width: 70%; height: 70%; }
+.zv__info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.zv__name { font-size: 16px; line-height: 1.3; }
+.zv__qty { color: var(--text-2); font-size: 15px; }
+.zv__sum { font-size: 20px; font-weight: 800; color: var(--accent); margin-top: auto; }
+.zv__shop { font-size: 12.5px; color: var(--text-3); }
