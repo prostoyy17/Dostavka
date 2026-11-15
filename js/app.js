@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794766149';
+const BUILD = '1794776277';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -196,7 +196,7 @@ function renderPage() {
   if (state.route === 'orders') { renderOrders(); return addBack(); }
   if (state.route === 'cart') { renderCartPage(); return addGap(); }
   if (state.route === 'account') return renderAccount();
-  if (state.route === 'address') return renderAddress();
+  if (state.route === 'address') { renderAddress.draft = null; return renderAddress(); }
   if (state.route === 'about') return renderAbout();
   if (state.route === 'settings') return renderSettings();
   if (state.route === 'checkout') return openCheckout();
@@ -370,6 +370,24 @@ function renderSettings() {
     </div>`;
   $('#darkSwitch').onchange = e => { state.theme = e.target.checked ? 'dark' : 'light'; LS.set('theme', state.theme); applyTheme(); };
 }
+/* Фото дома, сохранённые в аккаунте: уменьшаем до 1280px и храним в телефоне (localStorage), чтобы прикреплять к каждому заказу */
+const shrinkPhoto = file => new Promise(res => {
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => {
+    const k = Math.min(1, 1280 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+    c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+    res(c.toDataURL('image/jpeg', 0.8));
+  };
+  im.onerror = () => { URL.revokeObjectURL(url); res(null); };
+  im.src = url;
+});
+const dataUrlToFile = (d, name) => { const [h, b] = d.split(','), bin = atob(b), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new File([u], name, { type: h.match(/:(.*?);/)[1] }); };
+const savedPhotos = () => LS.get('addrPhotos', []);
+const saveHousePhotos = list => { try { localStorage.setItem('s95_addrPhotos', JSON.stringify(list)); return true; } catch { toast('Не хватает места в телефоне для фото'); return false; } };
+const photoTiles = (list, max = 3) => list.map((u, i) => `<div class="photos__item"><img src="${u}" alt=""><button type="button" data-ph-del="${i}" aria-label="Удалить">${svgI('x', 14)}</button></div>`).join('')
+  + (list.length < max ? `<button type="button" class="photos__add" data-ph-add>${svgI('plus', 22)}<span>Добавить</span></button>` : '');
+
 // Переключатель «Частный дом / Квартира-офис»: плашка плавно переезжает, потом меняются поля
 const kindSwitch = flat => `<div class="kindsw" data-k="${flat ? 'flat' : 'house'}">
   <button type="button" class="${flat ? '' : 'on'}" data-kind="house">Частный дом</button>
@@ -400,11 +418,27 @@ function renderAddress() {
         </div>` : ''}
         <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
         <div class="field"><textarea name="comment" placeholder=" ">${esc(f.comment || '')}</textarea><label>Комментарий курьеру</label></div>
+        <div class="photos">
+          <div class="photos__title">Фото дома или входа <span>до 3 фото, будут прикрепляться к заказам</span></div>
+          <div class="photos__list" id="accPhotoList"></div>
+          <input type="file" id="accPhotoInput" accept="image/*" multiple hidden>
+        </div>
         <button class="acc__login acc__save" type="submit">Сохранить</button>
       </form>
     </div>`;
   const form = $('#addrForm');
+  let photos = renderAddress.draft || savedPhotos();
+  const drawAcc = () => { $('#accPhotoList').innerHTML = photoTiles(photos); };
+  drawAcc();
+  $('#accPhotoInput').onchange = async e => {
+    const files = [...e.target.files].slice(0, 3 - photos.length); e.target.value = '';
+    for (const fl of files) { const d = await shrinkPhoto(fl); if (d) photos.push(d); }
+    renderAddress.draft = photos; drawAcc();
+  };
   form.onclick = e => {
+    if (e.target.closest('[data-ph-add]')) { $('#accPhotoInput').click(); return; }
+    const del = e.target.closest('[data-ph-del]');
+    if (del) { photos.splice(+del.dataset.phDel, 1); renderAddress.draft = photos; drawAcc(); return; }
     const kd = e.target.closest('[data-kind]');
     if (!kd || kd.dataset.kind === (f.kind || 'house')) return;
     const d = Object.fromEntries(new FormData(form));
@@ -418,6 +452,8 @@ function renderAddress() {
     if (flat && !d.apt?.trim()) { toast('Укажите квартиру'); return; }
     state.address = { ...state.address, ...d, street: d.street.trim(), house: '', kind: flat ? 'flat' : 'house' };
     if (!flat) Object.assign(state.address, { apt: '', entrance: '', floor: '', code: '' });
+    if (!saveHousePhotos(photos)) return;
+    renderAddress.draft = null;
     LS.set('address', state.address);
     renderPoint();
     toast('Адрес сохранён');
@@ -894,6 +930,7 @@ function openCheckout() {
     $('#photoList').innerHTML = orderPhotos.map((ph, i) => `<div class="photos__item"><img src="${ph.url}" alt=""><button type="button" data-photo-del="${i}" aria-label="Удалить">${svgI('x', 14)}</button></div>`).join('')
       + (orderPhotos.length < 3 ? `<button type="button" class="photos__add" data-photo-add>${svgI('plus', 22)}<span>Добавить</span></button>` : '');
   };
+  if (HOUSE_PHOTOS && !orderPhotos.length) orderPhotos = savedPhotos().map((d, i) => ({ file: dataUrlToFile(d, `dom${i + 1}.jpg`), url: d, saved: true }));
   if (HOUSE_PHOTOS) drawPhotos();
   checkoutCard = null; orderCardImage({ total: t.total }, t.okLines).then(file => { checkoutCard = file; });
   if (HOUSE_PHOTOS) $('#photoInput').onchange = e => {
