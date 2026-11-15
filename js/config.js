@@ -5,6 +5,11 @@ const WAREHOUSES_ENABLED = false;
 const STICKY_HEADER = false;
 // Заказы отправляются в WhatsApp на этот номер (только цифры, с 7 в начале)
 const ORDER_WHATSAPP = '79262219595';
+// Заказы приходят в Telegram через бота @mayrmarketbot (запасной путь — WhatsApp выше).
+// TG_CHATS — кому приходят заказы (id чатов; человек должен один раз нажать «Start» у бота).
+// Токен виден в коде сайта: если бота начнут использовать для спама — выпустить новый в @BotFather и заменить здесь.
+const TG_BOT_TOKEN = '9101192609:AAGU4q5_slo7b8JI-5Hv8kThzNKrmzJqz_I';
+const TG_CHATS = ['8701334852'];
 // Параметры доставки задаёт владелец сервиса. minOrder: 0 — без минимальной суммы заказа.
 const STORES = window.CATALOG.meta.stores;
 const POINTS = [

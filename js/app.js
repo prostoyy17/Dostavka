@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794739137';
+const BUILD = '1794765350';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -573,7 +573,7 @@ const STEPS_PICKUP = [['clip', 'Принят'], ['bag', 'Собираем'], ['s
 const payLabel = p => ({ card: 'Картой онлайн', sbp: 'СБП', 'courier-card': 'Картой при получении', cash: 'Наличными' })[p] || p;
 
 function orderStage(o) {
-  if (o.via === 'wa') return 3;   // статус знает продавец в WhatsApp, на сайте не выдумываем
+  if (o.via === 'wa' || o.via === 'tg') return 3;   // статус знает продавец в WhatsApp, на сайте не выдумываем
   if (o.slot && o.slot !== 'asap') {
     const start = new Date(o.slot).getTime() - 30 * 60e3;
     if (Date.now() < start) return 0;
@@ -599,13 +599,13 @@ function renderOrders() {
       return `<div class="order">
         <div class="order__head">
           <div><div class="order__num">№${o.id} · ${pt.city}</div><div class="order__date">${new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} · ${o.mode === 'pickup' ? 'самовывоз' : o.address}</div></div>
-          <span class="order__status ${st === 3 ? 'done' : ''}">${o.via === 'wa' ? 'Отправлен в WhatsApp' : steps[st][1]}</span>
+          <span class="order__status ${st === 3 ? 'done' : ''}">${o.via === 'tg' ? 'Отправлен продавцу' : o.via === 'wa' ? 'Отправлен в WhatsApp' : steps[st][1]}</span>
         </div>
         <div class="order__icons">${o.items.slice(0, 7).map(i => byId[i.id] ? `<span style="background:${byId[i.id].img ? '#fff' : catById[byId[i.id].cat].color}">${pic(byId[i.id])}</span>` : '').join('')}${o.items.length > 7 ? `<em>+${o.items.length - 7}</em>` : ''}</div>
         <div class="order__foot">
           <span class="order__sum">${rub(o.total)}</span>
           <span class="order__btns">
-            <button class="btn btn--ghost btn--sm" data-track="${o.id}">${o.via === 'wa' ? 'Подробнее' : 'Статус'}</button>
+            <button class="btn btn--ghost btn--sm" data-track="${o.id}">${o.via === 'wa' || o.via === 'tg' ? 'Подробнее' : 'Статус'}</button>
             <button class="btn btn--primary btn--sm" data-repeat="${o.id}">Повторить</button>
           </span>
         </div>
@@ -855,7 +855,7 @@ function openCheckout() {
       <div class="totals__row"><span>${pickup ? 'Самовывоз' : 'Доставка'}</span><b>${tt.delivery ? rub(tt.delivery) : 'Бесплатно'}</b></div>
       ${f.tip && !pickup ? `<div class="totals__row"><span>Чаевые</span><b>${rub(f.tip)}</b></div>` : ''}
       <div class="totals__row totals__row--total"><span>К оплате</span><b>${rub(sum)}</b></div>`;
-    $('#payBtn').innerHTML = `<span class="wa-btn">${svgI('whatsapp', 22)}Отправить заказ</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
+    $('#payBtn').innerHTML = `<span class="wa-btn">${typeof TG_BOT_TOKEN !== 'undefined' && TG_BOT_TOKEN ? '' : svgI('whatsapp', 22)}Отправить заказ</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
   };
   const drawPay = () => {
     $('#payExtra').innerHTML = f.pay === 'card' ? `<div class="card-form">
@@ -957,7 +957,7 @@ function maskPhone(v) {
 // Заказ уходит продавцу в WhatsApp готовым сообщением (без сервера)
 let orderPhotos = [], sentPhotos = [], sentCard = null, checkoutCard = null;
 // Фото дома и отправка файлами — включим, когда будет сервер (тогда всё уйдёт одним сообщением автоматически)
-const HOUSE_PHOTOS = false, SHARE_FILES = false;   // фото дома: в форме и после отправки (для «Отправить фото»)
+const HOUSE_PHOTOS = true, SHARE_FILES = false;   // фото дома: в форме и после отправки (для «Отправить фото»)
 function orderMessage(o, f, t, withFiles) {
   const L = [], line = '━━━━━━━━━━━━━━';
   const kg = t.okLines.some(l => l.p.kg);
@@ -1044,6 +1044,32 @@ const waLink = text => `https://wa.me/${ORDER_WHATSAPP}?text=${encodeURIComponen
    Если чат с продавцом у клиента уже есть (не первый заказ) — всё одним действием:
    «Поделиться» → WhatsApp → чат продавца, и уходят текст + картинка заказа + фото дома.
    Первый заказ: чата ещё нет, поэтому открываем чат по ссылке (только текст), а фото — вторым шагом. */
+/* ===== Отправка заказа в Telegram через бота (прямо из браузера, без сервера) ===== */
+const tgHtml = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(^|\s)_([^_\n]+)_(?=\s|$)/g, '$1<i>$2</i>');
+async function tgCall(method, body) {
+  const r = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/${method}`, { method: 'POST', body });
+  const j = await r.json().catch(() => ({}));
+  if (!j.ok) throw new Error(j.description || `Telegram ${r.status}`);
+  return j;
+}
+async function sendOrderTelegram(text, files) {
+  for (const chat of TG_CHATS) {
+    if (files.length === 1) {
+      const fd = new FormData(); fd.append('chat_id', chat); fd.append('photo', files[0], files[0].name || 'photo.jpg');
+      await tgCall('sendPhoto', fd);
+    } else if (files.length > 1) {
+      const fd = new FormData(); fd.append('chat_id', chat);
+      fd.append('media', JSON.stringify(files.map((_, i) => ({ type: 'photo', media: `attach://f${i}` }))));
+      files.forEach((f, i) => fd.append(`f${i}`, f, f.name || `photo${i}.jpg`));
+      await tgCall('sendMediaGroup', fd);
+    }
+    const fd = new FormData(); fd.append('chat_id', chat); fd.append('text', tgHtml(text)); fd.append('parse_mode', 'HTML');
+    fd.append('link_preview_options', JSON.stringify({ is_disabled: true }));
+    await tgCall('sendMessage', fd);
+  }
+}
+
 function placeOrder(f) {
   const t = totals();
   const d = new Date(), id = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getTime()).slice(-3)}`;
@@ -1066,6 +1092,25 @@ function placeOrder(f) {
     location.hash = '#/orders';
     setTimeout(() => openTracking(order.id), 60);
   };
+  if (typeof TG_BOT_TOKEN !== 'undefined' && TG_BOT_TOKEN && TG_CHATS.length) {
+    const btn = $('#payBtn'); btn.disabled = true; btn.innerHTML = '<span>Отправляем заказ…</span>';
+    (async () => {
+      const card = checkoutCard || await orderCardImage(order, t.okLines);
+      const fl = [card, ...photos].filter(Boolean).slice(0, 10);
+      sentPhotos = photos; order.text = orderMessage(order, f, t, true);
+      await sendOrderTelegram(order.text, fl);
+      order.via = 'tg'; finish(true);
+    })().catch(err => {
+      console.warn('Telegram:', err);
+      btn.disabled = false;
+      // запасной путь: WhatsApp (только текст)
+      sentPhotos = photos; order.text = orderMessage(order, f, t, false);
+      toast('Не удалось отправить напрямую — открываем WhatsApp');
+      finish(false);
+      setTimeout(() => { location.href = waLink(order.text); }, 700);
+    });
+    return;
+  }
   if (SHARE_FILES && LS.get('waKnown', false) && files.length && navigator.canShare && navigator.canShare({ files })) {
     sentPhotos = photos; order.text = orderMessage(order, f, t, true);
     navigator.share({ files, text: order.text })
@@ -1105,6 +1150,28 @@ let trackTimer = null;
 function openTracking(id) {
   const o = state.orders.find(x => x.id === id);
   if (!o) return;
+  if (o.via === 'tg') {
+    const m = $('#modal');
+    m.className = 'modal show';
+    m.innerHTML = `
+      <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
+      <div class="success">
+        <span class="success__icon">${svgI('check', 56)}</span>
+        <h2>Заказ №${o.id} отправлен</h2>
+        <p>Продавец уже получил заказ. Он проверит наличие и свяжется с вами${o.pay === 'sbp' ? ' — пришлёт оплату по СБП' : ''}.</p>
+        <div class="totals" style="margin-top:14px;text-align:left">
+          <div class="totals__row"><span>Адрес</span><b>${esc(o.address)}</b></div>
+          <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
+          <div class="totals__row totals__row--total"><span>Сумма</span><b>${rub(o.total)}</b></div>
+        </div>
+        <div class="row row--2" style="margin-top:12px">
+          <a class="btn btn--ghost" href="#/orders">Мои заказы</a>
+          <button class="btn btn--primary" data-close>Продолжить</button>
+        </div>
+      </div>`;
+    showOverlay();
+    return;
+  }
   if (o.via === 'wa') {
     const m = $('#modal');
     m.className = 'modal show';
