@@ -932,3 +932,10 @@ body.sticky-header .layout { padding-top: 16px; }
 .zv__qty { color: var(--text-2); font-size: 15px; }
 .zv__sum { font-size: 20px; font-weight: 800; color: var(--accent); margin-top: auto; }
 .zv__shop { font-size: 12.5px; color: var(--text-3); }
+/* переключатель «Частный дом / Квартира-офис»: обе стороны хорошо видны */
+.kindsw { background: var(--surface); border: 1.5px solid var(--line); }
+.kindsw button { color: var(--text-2); }
+.kindsw button:not(.on) { background: var(--surface-2); }
+:root[data-theme="dark"] .kindsw { border-color: var(--surface-3); }
+:root[data-theme="dark"] .kindsw button:not(.on) { background: var(--surface-3); color: var(--text); }
+.field textarea { padding-top: 28px; height: 84px; }

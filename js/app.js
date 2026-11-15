@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794765710';
+const BUILD = '1794766000';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -392,6 +392,7 @@ function renderAddress() {
           <div class="field"><input name="code" placeholder=" " value="${esc(f.code || '')}"><label>Домофон</label></div>
         </div>` : ''}
         <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
+        <div class="field"><textarea name="comment" placeholder=" ">${esc(f.comment || '')}</textarea><label>Комментарий курьеру</label></div>
         <button class="acc__login acc__save" type="submit">Сохранить</button>
       </form>
     </div>`;
@@ -817,7 +818,7 @@ function openCheckout() {
             <div class="field"><input name="code" placeholder=" " value="${esc(f.code || '')}"><label>Домофон</label></div>
           </div>` : ''}
           <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
-          <div class="field"><textarea name="comment" placeholder=" "></textarea><label>Комментарий курьеру</label></div>
+          <div class="field"><textarea name="comment" placeholder=" ">${esc(f.comment || '')}</textarea><label>Комментарий курьеру</label></div>
           ${HOUSE_PHOTOS ? `<div class="photos">
             <div class="photos__title">Фото дома или входа <span>до 3 фото, по желанию</span></div>
             <div class="photos__list" id="photoList"></div>
@@ -953,7 +954,7 @@ function openCheckout() {
     }
     if (first) { first.focus(); toast('Проверьте поля'); return; }
 
-    state.address = { ...state.address, kind: flat ? 'flat' : 'house', name: data.name, phone: data.phone, ...(pickup ? {} : { street: data.street.trim(), house: '', apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
+    state.address = { ...state.address, kind: flat ? 'flat' : 'house', name: data.name, phone: data.phone, ...(pickup ? {} : { comment: data.comment || '', street: data.street.trim(), house: '', apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
     LS.set('address', state.address);
     placeOrder({ ...f, ...data, pickup, kind: flat ? 'flat' : 'house' });
   };
