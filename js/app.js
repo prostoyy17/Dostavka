@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794737551';
+const BUILD = '1794738508';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -870,6 +870,7 @@ function openCheckout() {
       + (orderPhotos.length < 3 ? `<button type="button" class="photos__add" data-photo-add>${svgI('plus', 22)}<span>Добавить</span></button>` : '');
   };
   drawPhotos();
+  checkoutCard = null; orderCardImage({ total: t.total }, t.okLines).then(file => { checkoutCard = file; });
   $('#photoInput').onchange = e => {
     [...e.target.files].slice(0, 3 - orderPhotos.length).forEach(file => orderPhotos.push({ file, url: URL.createObjectURL(file) }));
     if (e.target.files.length > 3) toast('Можно добавить до 3 фото');
@@ -953,8 +954,8 @@ function maskPhone(v) {
 }
 
 // Заказ уходит продавцу в WhatsApp готовым сообщением (без сервера)
-let orderPhotos = [], sentPhotos = [], sentCard = null;   // фото дома: в форме и после отправки (для «Отправить фото»)
-function orderMessage(o, f, t) {
+let orderPhotos = [], sentPhotos = [], sentCard = null, checkoutCard = null;   // фото дома: в форме и после отправки (для «Отправить фото»)
+function orderMessage(o, f, t, withFiles) {
   const L = [], line = '━━━━━━━━━━━━━━';
   const kg = t.okLines.some(l => l.p.kg);
   L.push(`🛒 *ЗАКАЗ №${o.id}*`);
@@ -994,8 +995,7 @@ function orderMessage(o, f, t) {
   if (f.tip && !f.pickup) L.push(`Чаевые: ${rub(f.tip)}`);
   L.push(`💰 *ИТОГО: ${kg ? '≈' : ''}${rub(o.total)}*`);
   if (kg) L.push('_⚖️ весовые товары — сумма после взвешивания_');
-  L.push('');
-  L.push(`🖼 _Фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''} — следующим сообщением_`);
+  if (!withFiles) { L.push(''); L.push(`🖼 _Фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''} — следующим сообщением_`); }
   return L.join('\n');
 }
 
@@ -1010,8 +1010,8 @@ async function orderCardImage(order, lines) {
   const imgs = await Promise.all(lines.map(l => load(l.p.img).then(im => im || load(`assets/icons/${l.p.icon}.webp`))));
   g.fillStyle = '#EEEDE8'; g.fillRect(0, 0, W, H);
   g.fillStyle = '#0033B0'; g.fillRect(0, 0, W, HEAD - 30);
-  g.fillStyle = '#fff'; g.font = font(800, 56); g.fillText(`Заказ №${order.id}`, PAD, 92);
-  g.font = font(500, 30); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText(`${lines.length} поз. · ${order.address}`.slice(0, 60), PAD, 138);
+  g.fillStyle = '#fff'; g.font = font(800, 56); g.fillText(order.id ? `Заказ №${order.id}` : 'Заказ', PAD, 92);
+  g.font = font(500, 30); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText([`${lines.length} поз.`, order.address].filter(Boolean).join(' · ').slice(0, 60), PAD, 138);
   const clip = (t, max) => { if (g.measureText(t).width <= max) return t; while (t.length && g.measureText(t + '…').width > max) t = t.slice(0, -1); return t + '…'; };
   lines.forEach((l, k) => {
     const y = HEAD + k * ROW;
@@ -1028,11 +1028,15 @@ async function orderCardImage(order, lines) {
   g.font = font(500, 26); g.fillStyle = '#8E92A6'; g.fillText('MayrMarket · с доставкой', PAD, fy + 92);
   try {
     const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
-    return blob ? new File([blob], `zakaz-${order.id}.jpg`, { type: 'image/jpeg' }) : null;
+    return blob ? new File([blob], `zakaz${order.id ? "-" + order.id : ""}.jpg`, { type: 'image/jpeg' }) : null;
   } catch { return null; }   // если какая-то картинка без разрешения — без карточки, только фото дома
 }
 const waLink = text => `https://wa.me/${ORDER_WHATSAPP}?text=${encodeURIComponent(text)}`;
 
+/* Отправка заказа.
+   Если чат с продавцом у клиента уже есть (не первый заказ) — всё одним действием:
+   «Поделиться» → WhatsApp → чат продавца, и уходят текст + картинка заказа + фото дома.
+   Первый заказ: чата ещё нет, поэтому открываем чат по ссылке (только текст), а фото — вторым шагом. */
 function placeOrder(f) {
   const t = totals();
   const d = new Date(), id = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getTime()).slice(-3)}`;
@@ -1042,16 +1046,30 @@ function placeOrder(f) {
     total: t.total + (f.pickup ? 0 : f.tip), pay: f.pay, slot: f.slot,
     address: f.pickup ? 'Самовывоз' : `${f.street.trim()}${f.kind === 'flat' && f.apt ? ', кв. ' + f.apt : ''}`
   };
-  sentPhotos = orderPhotos.map(ph => ph.file); orderPhotos = [];
-  order.text = orderMessage(order, f, t);
-  sentCard = null; orderCardImage(order, t.okLines).then(file => { sentCard = file; });
+  const photos = orderPhotos.map(ph => ph.file);
+  const files = [checkoutCard, ...photos].filter(Boolean);
+  const finish = oneStep => {
+    sentPhotos = oneStep ? [] : photos; orderPhotos = [];
+    sentCard = oneStep ? null : checkoutCard;
+    order.oneStep = oneStep;
+    state.orders.unshift(order);
+    t.okLines.forEach(l => delete state.cart[l.p.id]);
+    LS.set('waKnown', true);
+    save();
+    location.hash = '#/orders';
+    setTimeout(() => openTracking(order.id), 60);
+  };
+  if (LS.get('waKnown', false) && files.length && navigator.canShare && navigator.canShare({ files })) {
+    sentPhotos = photos; order.text = orderMessage(order, f, t, true);
+    navigator.share({ files, text: order.text })
+      .then(() => finish(true))
+      .catch(e => { if (e && e.name !== 'AbortError') toast('Не получилось отправить, попробуйте ещё раз'); });
+    return;
+  }
+  sentPhotos = photos; order.text = orderMessage(order, f, t, false);
   const url = waLink(order.text);
   const win = window.open(url, '_blank');   // в обработчике нажатия — браузер разрешает
-  state.orders.unshift(order);
-  t.okLines.forEach(l => delete state.cart[l.p.id]);
-  save();
-  location.hash = '#/orders';
-  setTimeout(() => openTracking(order.id), 60);
+  finish(false);
   if (!win) location.href = url;
 }
 
@@ -1068,13 +1086,13 @@ function openTracking(id) {
       <div class="success">
         <span class="success__icon success__icon--wa">${svgI('whatsapp', 56)}</span>
         <h2>Заказ №${o.id}</h2>
-        <p>Шаг 1: в WhatsApp открылся текст заказа — нажмите там «Отправить». Шаг 2: вернитесь сюда и отправьте фото. Продавец подтвердит наличие и пришлёт ${o.pay === 'sbp' ? 'ссылку для оплаты по СБП' : 'время доставки'}.</p>
+        <p>${o.oneStep ? 'Заказ с фото отправлен продавцу в WhatsApp.' : 'Шаг 1: в WhatsApp открылся текст заказа — нажмите там «Отправить». Шаг 2: вернитесь сюда и отправьте фото. В следующий раз всё уйдёт сразу, одним сообщением.'} Продавец подтвердит наличие и пришлёт ${o.pay === 'sbp' ? 'ссылку для оплаты по СБП' : 'время доставки'}.</p>
         <div class="totals" style="margin-top:14px;text-align:left">
           <div class="totals__row"><span>${o.mode === 'pickup' ? 'Получение' : 'Адрес'}</span><b>${esc(o.address)}</b></div>
           <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
           <div class="totals__row totals__row--total"><span>Сумма</span><b>${rub(o.total)}</b></div>
         </div>
-        ${o.id === state.orders[0]?.id ? `<button class="btn btn--primary btn--block wa-open" data-share-photos>${svgI('whatsapp', 20)}Шаг 2: отправить фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''}</button>
+        ${o.id === state.orders[0]?.id && !o.oneStep ? `<button class="btn btn--primary btn--block wa-open" data-share-photos>${svgI('whatsapp', 20)}Шаг 2: отправить фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''}</button>
         <div class="checkout__hint" style="text-align:center">Выберите WhatsApp, затем чат продавца</div>` : ''}
         <a class="btn btn--ghost btn--block wa-again" style="margin-top:10px" href="${waLink(o.text || `Заказ №${o.id}`)}" target="_blank" rel="noopener">${svgI('whatsapp', 20)}Шаг 1 ещё раз: текст заказа</a>
         <div class="row row--2" style="margin-top:8px">
@@ -1232,7 +1250,7 @@ document.addEventListener('click', e => {
 
   if ((x = el('[data-track]'))) return openTracking(x.dataset.track);
   if (el('[data-share-photos]')) {
-    const files = [sentCard, ...sentPhotos].filter(Boolean);
+    const files = [sentCard || checkoutCard, ...sentPhotos].filter(Boolean);
     if (!files.length) { toast('Картинка заказа ещё готовится, нажмите через секунду'); return; }
     if (navigator.canShare && navigator.canShare({ files })) navigator.share({ files }).catch(() => {});
     else toast('Ваш браузер не умеет отправлять фото — прикрепите их в WhatsApp вручную');
