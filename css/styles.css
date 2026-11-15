@@ -932,10 +932,15 @@ body.sticky-header .layout { padding-top: 16px; }
 .zv__qty { color: var(--text-2); font-size: 15px; }
 .zv__sum { font-size: 20px; font-weight: 800; color: var(--accent); margin-top: auto; }
 .zv__shop { font-size: 12.5px; color: var(--text-3); }
-/* переключатель «Частный дом / Квартира-офис»: обе стороны хорошо видны */
-.kindsw { background: var(--surface); border: 1.5px solid var(--line); }
-.kindsw button { color: var(--text-2); }
-.kindsw button:not(.on) { background: var(--surface-2); }
-:root[data-theme="dark"] .kindsw { border-color: var(--surface-3); }
-:root[data-theme="dark"] .kindsw button:not(.on) { background: var(--surface-3); color: var(--text); }
-.field textarea { padding-top: 28px; height: 84px; }
+/* переключатель «Частный дом / Квартира-офис»: как переключатель входа — белая капсула и синяя плашка, которая плавно переезжает */
+.kindsw { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 5px; border-radius: 20px; border: 0;
+  background: var(--surface); box-shadow: 0 1px 2px rgba(14, 20, 51, .06), 0 4px 14px -6px rgba(14, 20, 51, .12); margin-bottom: 4px; }
+.kindsw::before { content: ""; position: absolute; top: 5px; bottom: 5px; left: 5px; width: calc(50% - 5px); border-radius: 15px; background: var(--accent);
+  box-shadow: 0 4px 12px -4px rgba(0, 51, 176, .55); transition: transform .32s cubic-bezier(.3, .8, .25, 1); }
+.kindsw[data-k="flat"]::before { transform: translateX(100%); }
+.kindsw button, .kindsw button:not(.on) { position: relative; z-index: 1; height: 50px; border-radius: 15px; background: none; display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 15.5px; font-weight: 700; color: var(--text-2); transition: color .25s; }
+.kindsw button.on { background: none; color: #fff; }
+.kindsw button .phi { opacity: .9; }
+:root[data-theme="dark"] .kindsw { background: var(--surface-2); box-shadow: none; }
+:root[data-theme="dark"] .kindsw button:not(.on) { background: none; color: var(--text-2); }

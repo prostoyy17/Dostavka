@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794766000';
+const BUILD = '1794766097';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -370,6 +370,16 @@ function renderSettings() {
     </div>`;
   $('#darkSwitch').onchange = e => { state.theme = e.target.checked ? 'dark' : 'light'; LS.set('theme', state.theme); applyTheme(); };
 }
+// Переключатель «Частный дом / Квартира-офис»: плашка плавно переезжает, потом меняются поля
+const kindSwitch = flat => `<div class="kindsw" data-k="${flat ? 'flat' : 'house'}">
+  <button type="button" class="${flat ? '' : 'on'}" data-kind="house">${svgI('home2', 20)}Частный дом</button>
+  <button type="button" class="${flat ? 'on' : ''}" data-kind="flat">${svgI('flat', 20)}Квартира / офис</button>
+</div>`;
+const slideKind = (btn, then) => {
+  const sw = btn.closest('.kindsw'); sw.dataset.k = btn.dataset.kind;
+  sw.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === btn));
+  setTimeout(then, 200);
+};
 function renderAddress() {
   const f = state.address || {};
   const flat = f.kind === 'flat', pt = POINTS[0];
@@ -377,10 +387,7 @@ function renderAddress() {
     <div class="acc">
       <h1 class="acc__title">Адрес доставки</h1>
       <form class="acc__form" id="addrForm" novalidate>
-        <div class="kindsw">
-          <button type="button" class="${flat ? '' : 'on'}" data-kind="house">Частный дом</button>
-          <button type="button" class="${flat ? 'on' : ''}" data-kind="flat">Квартира / офис</button>
-        </div>
+        ${kindSwitch(flat)}
         <div class="field"><input name="street" placeholder=" " value="${esc([f.street, f.house].filter(Boolean).join(', '))}" autocomplete="street-address"><label>Улица и дом</label></div>
         ${flat ? `
         <div class="row row--2" style="grid-template-columns:1fr 1fr">
@@ -402,7 +409,7 @@ function renderAddress() {
     if (!kd || kd.dataset.kind === (f.kind || 'house')) return;
     const d = Object.fromEntries(new FormData(form));
     state.address = { ...state.address, ...d, house: '', kind: kd.dataset.kind };
-    renderAddress();
+    slideKind(kd, renderAddress);
   };
   form.onsubmit = e => {
     e.preventDefault();
@@ -803,10 +810,7 @@ function openCheckout() {
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">1</span>${pickup ? 'Самовывоз' : 'Адрес доставки'} · ${pt.city}</div>
           ${pickup ? `<div class="pickup-box">${svgI('store', 26)}<div><b>Заберёте заказ сами</b><div style="font-size:13px;color:var(--text-2)">Адрес и время выдачи пришлём в WhatsApp, когда соберём заказ</div></div></div>` : `
-          <div class="kindsw">
-            <button type="button" class="${flat ? '' : 'on'}" data-kind="house">Частный дом</button>
-            <button type="button" class="${flat ? 'on' : ''}" data-kind="flat">Квартира / офис</button>
-          </div>
+          ${kindSwitch(flat)}
           <div class="field"><input name="street" placeholder=" " value="${esc([f.street, f.house].filter(Boolean).join(', '))}" autocomplete="street-address"><label>Улица и дом</label></div>
           ${flat ? `
           <div class="row row--2" style="grid-template-columns:1fr 1fr">
@@ -910,8 +914,9 @@ function openCheckout() {
       const d = Object.fromEntries(new FormData(form));
       ['street', 'apt', 'entrance', 'floor', 'code', 'zone', 'name', 'phone'].forEach(k => { if (d[k] !== undefined) state.address[k] = d[k]; }); state.address.house = '';
       state.address.kind = kd.dataset.kind;
-      const keepComment = d.comment;
-      openCheckout(); if (keepComment) $('#checkoutForm [name=comment]').value = keepComment;
+      state.address.comment = d.comment || '';
+      const y = window.scrollY;
+      slideKind(kd, () => { openCheckout(); window.scrollTo(0, y); });
       return;
     }
     const sw = e.target.closest('[data-mode-sw]');
