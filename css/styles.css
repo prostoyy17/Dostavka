@@ -916,3 +916,5 @@ body.sticky-header .layout { padding-top: 16px; }
 /* Safari красит свою нижнюю панель в цвет «прилипающих» элементов у низа экрана —
    блок «Ваш заказ» с синей кнопкой был прилипающим, отсюда синий низ. На телефоне он обычный. */
 @media (max-width: 760px) { .checkout__side-inner { position: static; } }
+
+.wa-again { display: flex; align-items: center; justify-content: center; gap: 8px; }

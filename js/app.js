@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794737051';
+const BUILD = '1794737551';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -953,36 +953,83 @@ function maskPhone(v) {
 }
 
 // Заказ уходит продавцу в WhatsApp готовым сообщением (без сервера)
-let orderPhotos = [], sentPhotos = [];   // фото дома: в форме и после отправки (для «Отправить фото»)
+let orderPhotos = [], sentPhotos = [], sentCard = null;   // фото дома: в форме и после отправки (для «Отправить фото»)
 function orderMessage(o, f, t) {
-  const L = [];
-  L.push(`*Новый заказ №${o.id}*`);
-  L.push(`${f.name}, ${f.phone}`);
-  if (f.pickup) L.push('Самовывоз');
+  const L = [], line = '━━━━━━━━━━━━━━';
+  const kg = t.okLines.some(l => l.p.kg);
+  L.push(`🛒 *ЗАКАЗ №${o.id}*`);
+  L.push(line);
+  L.push('👤 *КЛИЕНТ*');
+  L.push(f.name.trim());
+  L.push(`📞 ${f.phone}`);
+  L.push('');
+  if (f.pickup) L.push('🏪 *САМОВЫВОЗ*');
   else {
-    L.push(`Доставка (${f.kind === 'flat' ? 'квартира/офис' : 'частный дом'}): ${o.address}${f.zone ? ` (${f.zone})` : ''}`);
-    const extra = [f.entrance && `подъезд ${f.entrance}`, f.floor && `этаж ${f.floor}`, f.code && `домофон ${f.code}`].filter(Boolean).join(', ');
-    if (extra) L.push(extra);
-    if (f.leave) L.push('Оставить у двери');
-    if (f.noCall) L.push('Не звонить в домофон');
+    L.push(`📍 *АДРЕС* — ${f.kind === 'flat' ? 'квартира / офис' : 'частный дом'}`);
+    L.push(o.address);
+    if (f.zone) L.push(`Район: ${f.zone}`);
+    if (f.kind === 'flat') {
+      const extra = [f.entrance && `подъезд ${f.entrance}`, f.floor && `этаж ${f.floor}`, f.code && `домофон ${f.code}`].filter(Boolean).join(' · ');
+      if (extra) L.push(extra);
+    }
+    if (f.comment?.trim()) L.push(`💬 ${f.comment.trim()}`);
+    if (f.leave) L.push('🚪 Оставить у двери');
+    if (f.noCall) L.push('🔕 Не звонить в домофон');
   }
+  L.push('');
   const slot = f.slot === 'asap' ? 'как можно скорее' : new Date(f.slot).toLocaleString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  L.push(`Время: ${slot}`);
-  L.push(`Оплата: ${payLabel(f.pay)}${f.pay === 'cash' && f.change ? `, сдача с ${f.change} ₽` : ''}`);
-  L.push(`Если товара нет: ${({ call: 'позвонить и согласовать', similar: 'заменить на похожий', remove: 'убрать из заказа' })[f.replace] || 'позвонить'}`);
-  if (f.comment?.trim()) L.push(`Комментарий: ${f.comment.trim()}`);
-  if (orderPhotos.length) L.push(`Фото дома: ${orderPhotos.length} шт — пришлю следующим сообщением`);
+  L.push(`🕐 *Время:* ${slot}`);
+  L.push(`💳 *Оплата:* ${payLabel(f.pay)}${f.pay === 'cash' && f.change ? `, сдача с ${f.change} ₽` : ''}`);
+  L.push(`🔁 *Нет товара:* ${({ call: 'позвонить и согласовать', similar: 'заменить на похожий', remove: 'убрать из заказа' })[f.replace] || 'позвонить'}`);
+  L.push(line);
+  L.push(`📦 *ТОВАРЫ — ${t.okLines.length} поз.*`);
   L.push('');
-  L.push('*Товары:*');
-  t.okLines.forEach((l, k) => L.push(`${k + 1}. ${l.p.name} — ${fmtQty(l.p, l.qty)} — ${l.p.kg ? '≈' : ''}${rub(l.sum)}`));
-  L.push('');
-  L.push(`Товары: ${rub(t.subtotal)}`);
+  t.okLines.forEach((l, k) => {
+    L.push(`*${k + 1}.* ${l.p.name}`);
+    L.push(`      ${fmtQty(l.p, l.qty)} × ${rubP(l.p.price)}${l.p.kg ? '/кг' : ''} = *${l.p.kg ? '≈' : ''}${rub(l.sum)}*`);
+  });
+  L.push(line);
+  L.push(`Товары: ${kg ? '≈' : ''}${rub(t.subtotal)}`);
   if (!f.pickup) L.push(`Доставка: ${t.delivery ? rub(t.delivery) : 'бесплатно'}`);
   if (f.tip && !f.pickup) L.push(`Чаевые: ${rub(f.tip)}`);
-  const kg = t.okLines.some(l => l.p.kg);
-  L.push(`*Итого: ${kg ? '≈' : ''}${rub(o.total)}*`);
-  if (kg) L.push('(весовые товары — сумма после взвешивания)');
+  L.push(`💰 *ИТОГО: ${kg ? '≈' : ''}${rub(o.total)}*`);
+  if (kg) L.push('_⚖️ весовые товары — сумма после взвешивания_');
+  L.push('');
+  L.push(`🖼 _Фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''} — следующим сообщением_`);
   return L.join('\n');
+}
+
+/* Картинка заказа: фото товаров со списком — одной картинкой, чтобы продавцу было видно, что брать */
+async function orderCardImage(order, lines) {
+  const W = 1080, PAD = 48, ROW = 156, HEAD = 190, FOOT = 150;
+  const H = HEAD + lines.length * ROW + FOOT;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const font = (w, sz) => `${w} ${sz}px Onest, system-ui, -apple-system, sans-serif`;
+  const load = src => new Promise(res => { if (!src) return res(null); const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; setTimeout(() => res(null), 8000); });
+  const imgs = await Promise.all(lines.map(l => load(l.p.img).then(im => im || load(`assets/icons/${l.p.icon}.webp`))));
+  g.fillStyle = '#EEEDE8'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#0033B0'; g.fillRect(0, 0, W, HEAD - 30);
+  g.fillStyle = '#fff'; g.font = font(800, 56); g.fillText(`Заказ №${order.id}`, PAD, 92);
+  g.font = font(500, 30); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText(`${lines.length} поз. · ${order.address}`.slice(0, 60), PAD, 138);
+  const clip = (t, max) => { if (g.measureText(t).width <= max) return t; while (t.length && g.measureText(t + '…').width > max) t = t.slice(0, -1); return t + '…'; };
+  lines.forEach((l, k) => {
+    const y = HEAD + k * ROW;
+    g.fillStyle = '#fff'; g.beginPath(); g.roundRect(PAD - 16, y, W - 2 * PAD + 32, ROW - 16, 26); g.fill();
+    const im = imgs[k], box = 116, bx = PAD, by = y + 12;
+    if (im) { const r = Math.min(box / im.width, box / im.height); g.drawImage(im, bx + (box - im.width * r) / 2, by + (box - im.height * r) / 2, im.width * r, im.height * r); }
+    g.fillStyle = '#0E1433'; g.font = font(800, 30); g.fillText(`${k + 1}.`, bx + box + 22, y + 52);
+    g.font = font(600, 30); const nx = bx + box + 70; g.fillText(clip(l.p.name, W - nx - PAD - 10), nx, y + 52);
+    g.font = font(500, 28); g.fillStyle = '#4B5170'; g.fillText(`${fmtQty(l.p, l.qty)} × ${rubP(l.p.price)}${l.p.kg ? '/кг' : ''}`, nx, y + 100);
+    g.font = font(800, 32); g.fillStyle = '#0033B0'; const sum = `${l.p.kg ? '≈' : ''}${rub(l.sum)}`; g.fillText(sum, W - PAD - g.measureText(sum).width, y + 100);
+  });
+  const fy = HEAD + lines.length * ROW + 30;
+  g.fillStyle = '#0E1433'; g.font = font(800, 44); g.fillText(`Итого: ${lines.some(l => l.p.kg) ? '≈' : ''}${rub(order.total)}`, PAD, fy + 50);
+  g.font = font(500, 26); g.fillStyle = '#8E92A6'; g.fillText('MayrMarket · с доставкой', PAD, fy + 92);
+  try {
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+    return blob ? new File([blob], `zakaz-${order.id}.jpg`, { type: 'image/jpeg' }) : null;
+  } catch { return null; }   // если какая-то картинка без разрешения — без карточки, только фото дома
 }
 const waLink = text => `https://wa.me/${ORDER_WHATSAPP}?text=${encodeURIComponent(text)}`;
 
@@ -995,8 +1042,9 @@ function placeOrder(f) {
     total: t.total + (f.pickup ? 0 : f.tip), pay: f.pay, slot: f.slot,
     address: f.pickup ? 'Самовывоз' : `${f.street.trim()}${f.kind === 'flat' && f.apt ? ', кв. ' + f.apt : ''}`
   };
-  order.text = orderMessage(order, f, t);
   sentPhotos = orderPhotos.map(ph => ph.file); orderPhotos = [];
+  order.text = orderMessage(order, f, t);
+  sentCard = null; orderCardImage(order, t.okLines).then(file => { sentCard = file; });
   const url = waLink(order.text);
   const win = window.open(url, '_blank');   // в обработчике нажатия — браузер разрешает
   state.orders.unshift(order);
@@ -1020,15 +1068,15 @@ function openTracking(id) {
       <div class="success">
         <span class="success__icon success__icon--wa">${svgI('whatsapp', 56)}</span>
         <h2>Заказ №${o.id}</h2>
-        <p>Заказ открыт в WhatsApp — нажмите там «Отправить». Продавец подтвердит наличие и пришлёт ${o.pay === 'sbp' ? 'ссылку для оплаты по СБП' : 'время доставки'}.</p>
+        <p>Шаг 1: в WhatsApp открылся текст заказа — нажмите там «Отправить». Шаг 2: вернитесь сюда и отправьте фото. Продавец подтвердит наличие и пришлёт ${o.pay === 'sbp' ? 'ссылку для оплаты по СБП' : 'время доставки'}.</p>
         <div class="totals" style="margin-top:14px;text-align:left">
           <div class="totals__row"><span>${o.mode === 'pickup' ? 'Получение' : 'Адрес'}</span><b>${esc(o.address)}</b></div>
           <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
           <div class="totals__row totals__row--total"><span>Сумма</span><b>${rub(o.total)}</b></div>
         </div>
-        ${sentPhotos.length && o.id === state.orders[0]?.id ? `<button class="btn btn--primary btn--block wa-open" data-share-photos>${svgI('whatsapp', 20)}Отправить фото дома (${sentPhotos.length})</button>
+        ${o.id === state.orders[0]?.id ? `<button class="btn btn--primary btn--block wa-open" data-share-photos>${svgI('whatsapp', 20)}Шаг 2: отправить фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''}</button>
         <div class="checkout__hint" style="text-align:center">Выберите WhatsApp, затем чат продавца</div>` : ''}
-        <a class="btn ${sentPhotos.length ? 'btn--ghost' : 'btn--primary'} btn--block ${sentPhotos.length ? '' : 'wa-open'}" style="margin-top:10px" href="${waLink(o.text || `Заказ №${o.id}`)}" target="_blank" rel="noopener">${svgI('whatsapp', 20)}Открыть WhatsApp ещё раз</a>
+        <a class="btn btn--ghost btn--block wa-again" style="margin-top:10px" href="${waLink(o.text || `Заказ №${o.id}`)}" target="_blank" rel="noopener">${svgI('whatsapp', 20)}Шаг 1 ещё раз: текст заказа</a>
         <div class="row row--2" style="margin-top:8px">
           <a class="btn btn--ghost" href="#/orders">Мои заказы</a>
           <button class="btn btn--ghost" data-close>Продолжить</button>
@@ -1184,9 +1232,10 @@ document.addEventListener('click', e => {
 
   if ((x = el('[data-track]'))) return openTracking(x.dataset.track);
   if (el('[data-share-photos]')) {
-    const files = sentPhotos;
-    if (navigator.canShare && navigator.canShare({ files })) navigator.share({ files, text: `Фото к заказу №${state.orders[0].id}` }).catch(() => {});
-    else toast('Прикрепите фото в чате WhatsApp вручную');
+    const files = [sentCard, ...sentPhotos].filter(Boolean);
+    if (!files.length) { toast('Картинка заказа ещё готовится, нажмите через секунду'); return; }
+    if (navigator.canShare && navigator.canShare({ files })) navigator.share({ files }).catch(() => {});
+    else toast('Ваш браузер не умеет отправлять фото — прикрепите их в WhatsApp вручную');
     return;
   }
   if ((x = el('[data-repeat]'))) return repeatOrder(x.dataset.repeat);
