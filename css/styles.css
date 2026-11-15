@@ -873,3 +873,12 @@ body.sticky-header .layout { padding-top: 16px; }
   body.sticky-header .layout { padding-top: 14px !important; }
 }
 @media (max-width: 760px) { .top__inner { padding-top: 6px; } }
+
+/* заказ через WhatsApp */
+.modesw { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 16px; background: var(--surface-2); margin-bottom: 14px; }
+.modesw button { height: 44px; border-radius: 12px; font-weight: 700; color: var(--text-3); }
+.modesw button.on { background: var(--accent); color: #fff; }
+.checkout__hint { font-size: 13px; color: var(--text-3); margin-top: 6px; }
+.wa-btn { display: inline-flex; align-items: center; gap: 8px; }
+.success__icon--wa { color: #25D366; }
+.wa-open { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 14px; background: #25D366 !important; }

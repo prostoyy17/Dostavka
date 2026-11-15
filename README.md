@@ -37,6 +37,7 @@ tools/
 | Что | Где |
 | --- | --- |
 | Часы работы (`hours: [9, 25]` — с 9:00 до 01:00 ночи), время и цена доставки, бесплатно от | `js/config.js`, массив `POINTS` |
+| Номер WhatsApp, куда приходят заказы | `js/config.js`, `ORDER_WHATSAPP` |
 | Включить выбор складов в шапке | `js/config.js`, `WAREHOUSES_ENABLED = true` |
 | Включить прилипающую шапку с поиском (как у Ozon) | `js/config.js`, `STICKY_HEADER = true` |
 | Цвета светлой темы | `css/styles.css`, блок `:root` в начале |

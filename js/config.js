@@ -3,6 +3,8 @@
 const WAREHOUSES_ENABLED = false;
 // Шапка «как у Ozon»: при прокрутке прилипает к верху, видна только строка поиска. false — выключено, true — включено.
 const STICKY_HEADER = false;
+// Заказы отправляются в WhatsApp на этот номер (только цифры, с 7 в начале)
+const ORDER_WHATSAPP = '79262219595';
 // Параметры доставки задаёт владелец сервиса. minOrder: 0 — без минимальной суммы заказа.
 const STORES = window.CATALOG.meta.stores;
 const POINTS = [

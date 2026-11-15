@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794604621';
+const BUILD = '1794734243';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -572,6 +572,7 @@ const STEPS_PICKUP = [['clip', 'Принят'], ['bag', 'Собираем'], ['s
 const payLabel = p => ({ card: 'Картой онлайн', sbp: 'СБП', 'courier-card': 'Картой при получении', cash: 'Наличными' })[p] || p;
 
 function orderStage(o) {
+  if (o.via === 'wa') return 3;   // статус знает продавец в WhatsApp, на сайте не выдумываем
   if (o.slot && o.slot !== 'asap') {
     const start = new Date(o.slot).getTime() - 30 * 60e3;
     if (Date.now() < start) return 0;
@@ -597,13 +598,13 @@ function renderOrders() {
       return `<div class="order">
         <div class="order__head">
           <div><div class="order__num">№${o.id} · ${pt.city}</div><div class="order__date">${new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} · ${o.mode === 'pickup' ? 'самовывоз' : o.address}</div></div>
-          <span class="order__status ${st === 3 ? 'done' : ''}">${steps[st][1]}</span>
+          <span class="order__status ${st === 3 ? 'done' : ''}">${o.via === 'wa' ? 'Отправлен в WhatsApp' : steps[st][1]}</span>
         </div>
         <div class="order__icons">${o.items.slice(0, 7).map(i => byId[i.id] ? `<span style="background:${byId[i.id].img ? '#fff' : catById[byId[i.id].cat].color}">${pic(byId[i.id])}</span>` : '').join('')}${o.items.length > 7 ? `<em>+${o.items.length - 7}</em>` : ''}</div>
         <div class="order__foot">
           <span class="order__sum">${rub(o.total)}</span>
           <span class="order__btns">
-            <button class="btn btn--ghost btn--sm" data-track="${o.id}">Статус</button>
+            <button class="btn btn--ghost btn--sm" data-track="${o.id}">${o.via === 'wa' ? 'Подробнее' : 'Статус'}</button>
             <button class="btn btn--primary btn--sm" data-repeat="${o.id}">Повторить</button>
           </span>
         </div>
@@ -767,7 +768,7 @@ function timeSlots() {
 function openCheckout() {
   const t = totals();
   if (!t.minOk || !t.okLines.length) return;
-  const f = { slot: 'asap', pay: 'card', tip: 0, ...state.address };
+  const f = { slot: 'asap', pay: 'sbp', tip: 0, ...state.address };
   const pt = t.pt, pickup = t.isPickup;
   const m = $('#modal');
   m.className = 'modal modal--wide show';
@@ -777,9 +778,13 @@ function openCheckout() {
     <form class="checkout" id="checkoutForm" novalidate>
       <div class="checkout__form">
         <h2 class="checkout__title">Оформление заказа</h2>
+        <div class="modesw">
+          <button type="button" class="${pickup ? '' : 'on'}" data-mode-sw="delivery">Доставка</button>
+          <button type="button" class="${pickup ? 'on' : ''}" data-mode-sw="pickup">Самовывоз</button>
+        </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">1</span>${pickup ? 'Самовывоз' : 'Адрес доставки'} · ${pt.city}</div>
-          ${pickup ? `<div class="pickup-box">${svgI('store', 26)}<div><b>${pt.address}</b><div style="font-size:13px;color:var(--text-2)">${hours(pt)} · ${pt.phone}</div></div></div>` : `
+          ${pickup ? `<div class="pickup-box">${svgI('store', 26)}<div><b>Заберёте заказ сами</b><div style="font-size:13px;color:var(--text-2)">Адрес и время выдачи пришлём в WhatsApp, когда соберём заказ</div></div></div>` : `
           <div class="row row--3">
             <div class="field"><input name="street" placeholder=" " value="${f.street || ''}"><label>Улица</label></div>
             <div class="field"><input name="house" placeholder=" " value="${f.house || ''}"><label>Дом</label></div>
@@ -790,7 +795,9 @@ function openCheckout() {
             <div class="field"><input name="floor" placeholder=" " value="${f.floor || ''}"><label>Этаж</label></div>
             <div class="field"><input name="code" placeholder=" " value="${f.code || ''}"><label>Домофон</label></div>
             <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
-          </div>`}
+          </div>
+          <div class="field"><textarea name="landmark" placeholder=" ">${esc(f.landmark || '')}</textarea><label>Как найти: ориентир, цвет ворот, подъезд</label></div>
+          <div class="checkout__hint">Фото дома или точку на карте можно отправить в WhatsApp вместе с заказом</div>`}
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">2</span>Контакты</div>
@@ -807,7 +814,7 @@ function openCheckout() {
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">4</span>Оплата</div>
           <div class="opts">
-            ${[['card', 'card', 'Картой онлайн', 'Visa, MC, МИР'], ['sbp', 'qr', 'СБП', 'По QR-коду'], ['courier-card', 'terminal', pickup ? 'Картой на кассе' : 'Картой курьеру', 'Терминал'], ['cash', 'cash', 'Наличными', 'При получении']]
+            ${[['sbp', 'qr', 'СБП', 'После подтверждения заказа'], ['courier-card', 'terminal', pickup ? 'Картой при получении' : 'Картой курьеру', 'Терминал'], ['cash', 'cash', 'Наличными', 'При получении']]
               .map(([id, icon, ti, su]) => `<button type="button" class="opt ${f.pay === id ? 'active' : ''}" data-pay="${id}">${svgI(icon, 24)}<span class="opt__title">${ti}</span><span class="opt__sub">${su}</span></button>`).join('')}
           </div>
           <div id="payExtra"></div>
@@ -846,7 +853,7 @@ function openCheckout() {
       <div class="totals__row"><span>${pickup ? 'Самовывоз' : 'Доставка'}</span><b>${tt.delivery ? rub(tt.delivery) : 'Бесплатно'}</b></div>
       ${f.tip && !pickup ? `<div class="totals__row"><span>Чаевые</span><b>${rub(f.tip)}</b></div>` : ''}
       <div class="totals__row totals__row--total"><span>К оплате</span><b>${rub(sum)}</b></div>`;
-    $('#payBtn').innerHTML = `<span>${f.pay === 'card' || f.pay === 'sbp' ? 'Оплатить' : 'Заказать'}</span><span>${rub(sum)}</span>`;
+    $('#payBtn').innerHTML = `<span class="wa-btn">${svgI('whatsapp', 22)}Отправить заказ</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
   };
   const drawPay = () => {
     $('#payExtra').innerHTML = f.pay === 'card' ? `<div class="card-form">
@@ -861,6 +868,12 @@ function openCheckout() {
     const s = e.target.closest('[data-slot]'), p = e.target.closest('[data-pay]'), tp = e.target.closest('[data-tip]');
     if (s) { f.slot = s.dataset.slot; $$('[data-slot]', form).forEach(b => b.classList.toggle('active', b === s)); }
     if (p) { f.pay = p.dataset.pay; $$('[data-pay]', form).forEach(b => b.classList.toggle('active', b === p)); drawPay(); drawTotals(); }
+    const sw = e.target.closest('[data-mode-sw]');
+    if (sw && sw.dataset.modeSw !== state.mode) {
+      const d = Object.fromEntries(new FormData(form));
+      state.address = { ...state.address, ...['street', 'house', 'apt', 'entrance', 'floor', 'code', 'zone', 'name', 'phone', 'landmark'].reduce((o, k) => (d[k] !== undefined ? (o[k] = d[k], o) : o), {}) };
+      state.mode = sw.dataset.modeSw; openCheckout(); return;
+    }
     if (tp) { f.tip = +tp.dataset.tip; $$('[data-tip]', form).forEach(b => b.classList.toggle('active', b === tp)); drawTotals(); }
   };
   form.oninput = e => {
@@ -895,11 +908,9 @@ function openCheckout() {
     }
     if (first) { first.focus(); toast('Проверьте поля'); return; }
 
-    state.address = { street: data.street, house: data.house, apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone, name: data.name, phone: data.phone };
+    state.address = { ...state.address, name: data.name, phone: data.phone, ...(pickup ? {} : { street: data.street, house: data.house, apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone, landmark: data.landmark }) };
     LS.set('address', state.address);
-    const btn = $('#payBtn');
-    btn.disabled = true; btn.innerHTML = '<span>Обрабатываем…</span>';
-    setTimeout(() => placeOrder({ ...f, ...data, pickup }), f.pay === 'card' || f.pay === 'sbp' ? 1200 : 500);
+    placeOrder({ ...f, ...data, pickup });
   };
 }
 
@@ -917,18 +928,56 @@ function maskPhone(v) {
   return out;
 }
 
+// Заказ уходит продавцу в WhatsApp готовым сообщением (без сервера)
+function orderMessage(o, f, t) {
+  const L = [];
+  L.push(`*Новый заказ №${o.id}*`);
+  L.push(`${f.name}, ${f.phone}`);
+  if (f.pickup) L.push('Самовывоз');
+  else {
+    L.push(`Доставка: ${o.address}${f.zone ? ` (${f.zone})` : ''}`);
+    const extra = [f.entrance && `подъезд ${f.entrance}`, f.floor && `этаж ${f.floor}`, f.code && `домофон ${f.code}`].filter(Boolean).join(', ');
+    if (extra) L.push(extra);
+    if (f.landmark?.trim()) L.push(`Как найти: ${f.landmark.trim()}`);
+    if (f.leave) L.push('Оставить у двери');
+    if (f.noCall) L.push('Не звонить в домофон');
+  }
+  const slot = f.slot === 'asap' ? 'как можно скорее' : new Date(f.slot).toLocaleString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  L.push(`Время: ${slot}`);
+  L.push(`Оплата: ${payLabel(f.pay)}${f.pay === 'cash' && f.change ? `, сдача с ${f.change} ₽` : ''}`);
+  L.push(`Если товара нет: ${({ call: 'позвонить и согласовать', similar: 'заменить на похожий', remove: 'убрать из заказа' })[f.replace] || 'позвонить'}`);
+  if (f.comment?.trim()) L.push(`Комментарий: ${f.comment.trim()}`);
+  L.push('');
+  L.push('*Товары:*');
+  t.okLines.forEach((l, k) => L.push(`${k + 1}. ${l.p.name} — ${fmtQty(l.p, l.qty)} — ${l.p.kg ? '≈' : ''}${rub(l.sum)}`));
+  L.push('');
+  L.push(`Товары: ${rub(t.subtotal)}`);
+  if (!f.pickup) L.push(`Доставка: ${t.delivery ? rub(t.delivery) : 'бесплатно'}`);
+  if (f.tip && !f.pickup) L.push(`Чаевые: ${rub(f.tip)}`);
+  const kg = t.okLines.some(l => l.p.kg);
+  L.push(`*Итого: ${kg ? '≈' : ''}${rub(o.total)}*`);
+  if (kg) L.push('(весовые товары — сумма после взвешивания)');
+  return L.join('\n');
+}
+const waLink = text => `https://wa.me/${ORDER_WHATSAPP}?text=${encodeURIComponent(text)}`;
+
 function placeOrder(f) {
   const t = totals();
+  const d = new Date(), id = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getTime()).slice(-3)}`;
   const order = {
-    id: String(Date.now()).slice(-6), createdAt: Date.now(), point: state.point, mode: state.mode,
+    id, createdAt: Date.now(), point: state.point, mode: f.pickup ? 'pickup' : 'delivery', via: 'wa',
     items: t.okLines.map(l => ({ id: l.p.id, name: l.p.name, qty: l.qty, price: l.p.price, offers: l.p.offers })),
     total: t.total + (f.pickup ? 0 : f.tip), pay: f.pay, slot: f.slot,
-    address: f.pickup ? point().address : `${f.street}, ${f.house}${f.apt ? ', кв. ' + f.apt : ''}`
+    address: f.pickup ? 'Самовывоз' : `${f.street}, ${f.house}${f.apt ? ', кв. ' + f.apt : ''}`
   };
+  order.text = orderMessage(order, f, t);
+  const url = waLink(order.text);
+  const win = window.open(url, '_blank');   // в обработчике нажатия — браузер разрешает
   state.orders.unshift(order);
   t.okLines.forEach(l => delete state.cart[l.p.id]);
   save(); renderAll();
   openTracking(order.id);
+  if (!win) location.href = url;
 }
 
 /* ================= Tracking ================= */
@@ -936,6 +985,29 @@ let trackTimer = null;
 function openTracking(id) {
   const o = state.orders.find(x => x.id === id);
   if (!o) return;
+  if (o.via === 'wa') {
+    const m = $('#modal');
+    m.className = 'modal show';
+    m.innerHTML = `
+      <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
+      <div class="success">
+        <span class="success__icon success__icon--wa">${svgI('whatsapp', 56)}</span>
+        <h2>Заказ №${o.id}</h2>
+        <p>Заказ открыт в WhatsApp — нажмите там «Отправить». Продавец подтвердит наличие и пришлёт ${o.pay === 'sbp' ? 'ссылку для оплаты по СБП' : 'время доставки'}.</p>
+        <div class="totals" style="margin-top:14px;text-align:left">
+          <div class="totals__row"><span>${o.mode === 'pickup' ? 'Получение' : 'Адрес'}</span><b>${esc(o.address)}</b></div>
+          <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
+          <div class="totals__row totals__row--total"><span>Сумма</span><b>${rub(o.total)}</b></div>
+        </div>
+        <a class="btn btn--primary btn--block wa-open" href="${waLink(o.text || `Заказ №${o.id}`)}" target="_blank" rel="noopener">${svgI('whatsapp', 20)}Открыть WhatsApp ещё раз</a>
+        <div class="row row--2" style="margin-top:8px">
+          <a class="btn btn--ghost" href="#/orders">Мои заказы</a>
+          <button class="btn btn--ghost" data-close>Продолжить</button>
+        </div>
+      </div>`;
+    showOverlay();
+    return;
+  }
   const pt = POINTS.find(p => p.id === o.point) || POINTS[0];
   const steps = o.mode === 'pickup' ? STEPS_PICKUP : STEPS_DELIVERY;
   const m = $('#modal');
