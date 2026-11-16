@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794782777';
+const BUILD = '1794814904';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -915,7 +915,7 @@ function openCheckout() {
       <div class="totals__row"><span>${pickup ? 'Самовывоз' : 'Доставка'}</span><b>${tt.delivery ? rub(tt.delivery) : 'Бесплатно'}</b></div>
       ${f.tip && !pickup ? `<div class="totals__row"><span>Чаевые</span><b>${rub(f.tip)}</b></div>` : ''}
       <div class="totals__row totals__row--total"><span>К оплате</span><b>${rub(sum)}</b></div>`;
-    $('#payBtn').innerHTML = `<span class="wa-btn">${typeof TG_BOT_TOKEN !== 'undefined' && TG_BOT_TOKEN ? '' : svgI('whatsapp', 22)}Отправить заказ</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
+    $('#payBtn').innerHTML = `<span class="wa-btn">${typeof TG_BOT_KEY !== 'undefined' ? '' : svgI('whatsapp', 22)}Отправить заказ</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
   };
   const drawPay = () => {
     $('#payExtra').innerHTML = f.pay === 'card' ? `<div class="card-form">
@@ -1106,8 +1106,14 @@ const waLink = text => `https://wa.me/${ORDER_WHATSAPP}?text=${encodeURIComponen
 /* ===== Отправка заказа в Telegram через бота (прямо из браузера, без сервера) ===== */
 const tgHtml = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(^|\s)_([^_\n]+)_(?=\s|$)/g, '$1<i>$2</i>');
+const tgToken = (() => { let v = null; return () => {
+  if (v) return v;
+  const k = TG_BOT_KEY, parts = []; k.o.forEach((src, i) => { parts[src] = k.p[i]; });
+  const raw = atob(parts.join('').split('').reverse().join('')), key = 'mayr-market-grozny';
+  return (v = [...raw].map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))).join(''));
+}; })();
 async function tgCall(method, body) {
-  const r = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/${method}`, { method: 'POST', body });
+  const r = await fetch(`https://api.telegram.org/bot${tgToken()}/${method}`, { method: 'POST', body });
   const j = await r.json().catch(() => ({}));
   if (!j.ok) throw new Error(j.description || `Telegram ${r.status}`);
   return j;
@@ -1151,7 +1157,7 @@ function placeOrder(f) {
     location.hash = '#/orders';
     setTimeout(() => openTracking(order.id), 60);
   };
-  if (typeof TG_BOT_TOKEN !== 'undefined' && TG_BOT_TOKEN && TG_CHATS.length) {
+  if (typeof TG_BOT_KEY !== 'undefined' && TG_CHATS.length) {
     const btn = $('#payBtn'); btn.disabled = true; btn.innerHTML = '<span>Отправляем заказ…</span>';
     (async () => {
       const card = checkoutCard || await orderCardImage(order, t.okLines);

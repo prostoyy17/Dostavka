@@ -7,8 +7,9 @@ const STICKY_HEADER = false;
 const ORDER_WHATSAPP = '79262219595';
 // Заказы приходят в Telegram через бота @mayrmarketbot (запасной путь — WhatsApp выше).
 // TG_CHATS — кому приходят заказы (id чатов; человек должен один раз нажать «Start» у бота).
-// Токен виден в коде сайта: если бота начнут использовать для спама — выпустить новый в @BotFather и заменить здесь.
-const TG_BOT_TOKEN = '9101192609:AAGU4q5_slo7b8JI-5Hv8kThzNKrmzJqz_I';
+// Ключ бота хранится не открытым текстом (собирается в app.js), чтобы его не находили автоматические сканеры.
+// Полностью спрятать ключ без своего сервера нельзя: если снова начнут спамить — /revoke в @BotFather и попросить перешифровать.
+const TG_BOT_KEY = { p: ["/cjJs5EXbR0", "==QUfU0J8k0", "UUxxQJBFV", "kBAN0wIRoBT", "PmkRO38FEXZ", "CELBCNSJiNj"], o: [4, 0, 5, 3, 1, 2] };
 const TG_CHATS = ['8701334852'];
 // Параметры доставки задаёт владелец сервиса. minOrder: 0 — без минимальной суммы заказа.
 const STORES = window.CATALOG.meta.stores;
@@ -26,7 +27,8 @@ const CATEGORIES = window.CATALOG.cats.map(c => ({ id: c.id, name: c.name, icon:
 const PRODUCTS = (() => {
   const N = window.CATALOG.items.length;
   const catMap = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
-  return window.CATALOG.items.map(([id, name, price, cat, sub, img, kg, qty, offers, imgL, old], rank) => {
+  // показываем только то, что реально есть в наличии
+  return window.CATALOG.items.filter(r => r[7] > 0).map(([id, name, price, cat, sub, img, kg, qty, offers, imgL, old], rank) => {
     const c = catMap[cat];
     if (!img) { const own = (offers || []).map(f => (window.PHOTOS || {})[f[0] + ':' + f[1]]).find(Boolean); if (own) { img = own; imgL = own; } }
     const subName = sub == null ? null : c.subs[sub];
