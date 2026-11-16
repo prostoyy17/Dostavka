@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794814904';
+const BUILD = '1794861951';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -1118,21 +1118,26 @@ async function tgCall(method, body) {
   if (!j.ok) throw new Error(j.description || `Telegram ${r.status}`);
   return j;
 }
+// Отправка с повтором: до 3 попыток на каждый шаг; заказ считается доставленным,
+// если дошёл хотя бы до одного получателя (если кто-то заблокировал бота — остальные всё равно получат)
+const retry = async (fn, n = 3) => { for (let a = 1; ; a++) { try { return await fn(); } catch (e) { if (a >= n || /chat not found|blocked|Forbidden|Unauthorized/i.test(e.message)) throw e; await new Promise(r => setTimeout(r, 800 * a)); } } };
 async function sendOrderTelegram(text, files) {
+  let ok = 0, lastErr = null;
   for (const chat of TG_CHATS) {
-    if (files.length === 1) {
-      const fd = new FormData(); fd.append('chat_id', chat); fd.append('photo', files[0], files[0].name || 'photo.jpg');
-      await tgCall('sendPhoto', fd);
-    } else if (files.length > 1) {
-      const fd = new FormData(); fd.append('chat_id', chat);
-      fd.append('media', JSON.stringify(files.map((_, i) => ({ type: 'photo', media: `attach://f${i}` }))));
-      files.forEach((f, i) => fd.append(`f${i}`, f, f.name || `photo${i}.jpg`));
-      await tgCall('sendMediaGroup', fd);
-    }
-    const fd = new FormData(); fd.append('chat_id', chat); fd.append('text', tgHtml(text)); fd.append('parse_mode', 'HTML');
-    fd.append('link_preview_options', JSON.stringify({ is_disabled: true }));
-    await tgCall('sendMessage', fd);
+    try {
+      if (files.length === 1) {
+        await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('photo', files[0], files[0].name || 'photo.jpg'); return tgCall('sendPhoto', fd); });
+      } else if (files.length > 1) {
+        await retry(() => { const fd = new FormData(); fd.append('chat_id', chat);
+          fd.append('media', JSON.stringify(files.map((_, i) => ({ type: 'photo', media: `attach://f${i}` }))));
+          files.forEach((f, i) => fd.append(`f${i}`, f, f.name || `photo${i}.jpg`)); return tgCall('sendMediaGroup', fd); }).catch(() => {});   // фото не дошли — текст всё равно отправим
+      }
+      await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('text', tgHtml(text)); fd.append('parse_mode', 'HTML');
+        fd.append('link_preview_options', JSON.stringify({ is_disabled: true })); return tgCall('sendMessage', fd); });
+      ok++;
+    } catch (e) { lastErr = e; console.warn('Telegram', chat, e); }
   }
+  if (!ok) throw lastErr || new Error('Telegram: никому не доставлено');
 }
 
 function placeOrder(f) {
