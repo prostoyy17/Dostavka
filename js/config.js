@@ -10,7 +10,7 @@ const ORDER_WHATSAPP = '79262219595';
 // Ключ бота хранится не открытым текстом (собирается в app.js), чтобы его не находили автоматические сканеры.
 // Полностью спрятать ключ без своего сервера нельзя: если снова начнут спамить — /revoke в @BotFather и попросить перешифровать.
 const TG_BOT_KEY = { p: ["/cjJs5EXbR0", "==QUfU0J8k0", "UUxxQJBFV", "kBAN0wIRoBT", "PmkRO38FEXZ", "CELBCNSJiNj"], o: [4, 0, 5, 3, 1, 2] };
-const TG_CHATS = ['8701334852'];
+const TG_CHATS = ['8701334852', '552884011'];   // @mininn17, @Mayr_197 (дядя)
 // Параметры доставки задаёт владелец сервиса. minOrder: 0 — без минимальной суммы заказа.
 const STORES = window.CATALOG.meta.stores;
 const POINTS = [
