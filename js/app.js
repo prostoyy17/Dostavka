@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794916457';
+const BUILD = '1794918721';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -48,7 +48,12 @@ const save = () => {
 if (!POINTS.some(p => p.id === state.point)) state.point = POINTS.length === 1 ? POINTS[0].id : null;
 state.mode = 'delivery';
 const point = () => POINTS.find(p => p.id === state.point);
-const stockOf = (p, pid = state.point || POINTS[0].id) => p ? (p.stock[pid] || 0) : 0;
+// Резерв: что этот телефон уже заказал, вычитаем из остатка на сутки (пока каталог не обновится).
+// Общий резерв для всех покупателей появится с сервером.
+const RESERVE_TTL = 24 * 3600e3;
+let reservedCache = null;
+const reserved = () => { if (reservedCache) return reservedCache; const r = LS.get('reserved', {}), now = Date.now(), out = {}; for (const [id, v] of Object.entries(r)) if (now - v.t < RESERVE_TTL) out[id] = v.q; return (reservedCache = out); };
+const stockOf = (p, pid = state.point || POINTS[0].id) => p ? Math.max(0, Math.round(((p.stock[pid] || 0) - (reserved()[p.id] || 0)) * 10) / 10) : 0;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 // Цены везде в целых рублях — копейки не показываем
 const rubP = n => Math.round(n).toLocaleString('ru-RU') + '\u00a0₽';
@@ -1070,8 +1075,8 @@ async function orderCardImage(order, lines) {
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
   const font = (w, sz) => `${w} ${sz}px Onest, system-ui, -apple-system, sans-serif`;
-  const load = src => new Promise(res => { if (!src) return res(null); const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; setTimeout(() => res(null), 8000); });
-  const imgs = await Promise.all(lines.map(l => load(l.p.img).then(im => im || load(`assets/icons/${l.p.icon}.webp`))));
+  const load = src => new Promise(res => { if (!src) return res(null); const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; setTimeout(() => res(null), 3000); });
+  const imgs = await Promise.all(lines.map(l => load(/kindar-product\.ru/.test(l.p.img || '') ? null : l.p.img).then(im => im || load(`assets/icons/${l.p.icon}.webp`))));
   g.fillStyle = '#EEEDE8'; g.fillRect(0, 0, W, H);
   g.fillStyle = '#0033B0'; g.fillRect(0, 0, W, HEAD - 30);
   g.fillStyle = '#fff'; g.font = font(800, 56); g.fillText(order.id ? `Заказ №${order.id}` : 'Заказ', PAD, 92);
@@ -1122,22 +1127,20 @@ async function tgCall(method, body) {
 // если дошёл хотя бы до одного получателя (если кто-то заблокировал бота — остальные всё равно получат)
 const retry = async (fn, n = 3) => { for (let a = 1; ; a++) { try { return await fn(); } catch (e) { if (a >= n || /chat not found|blocked|Forbidden|Unauthorized/i.test(e.message)) throw e; await new Promise(r => setTimeout(r, 800 * a)); } } };
 async function sendOrderTelegram(text, files) {
-  let ok = 0, lastErr = null;
-  for (const chat of TG_CHATS) {
-    try {
-      if (files.length === 1) {
-        await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('photo', files[0], files[0].name || 'photo.jpg'); return tgCall('sendPhoto', fd); });
-      } else if (files.length > 1) {
-        await retry(() => { const fd = new FormData(); fd.append('chat_id', chat);
-          fd.append('media', JSON.stringify(files.map((_, i) => ({ type: 'photo', media: `attach://f${i}` }))));
-          files.forEach((f, i) => fd.append(`f${i}`, f, f.name || `photo${i}.jpg`)); return tgCall('sendMediaGroup', fd); }).catch(() => {});   // фото не дошли — текст всё равно отправим
-      }
-      await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('text', tgHtml(text)); fd.append('parse_mode', 'HTML');
-        fd.append('link_preview_options', JSON.stringify({ is_disabled: true })); return tgCall('sendMessage', fd); });
-      ok++;
-    } catch (e) { lastErr = e; console.warn('Telegram', chat, e); }
-  }
-  if (!ok) throw lastErr || new Error('Telegram: никому не доставлено');
+  const one = async chat => {
+    if (files.length === 1) {
+      await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('photo', files[0], files[0].name || 'photo.jpg'); return tgCall('sendPhoto', fd); }).catch(() => {});
+    } else if (files.length > 1) {
+      await retry(() => { const fd = new FormData(); fd.append('chat_id', chat);
+        fd.append('media', JSON.stringify(files.map((_, i) => ({ type: 'photo', media: `attach://f${i}` }))));
+        files.forEach((f, i) => fd.append(`f${i}`, f, f.name || `photo${i}.jpg`)); return tgCall('sendMediaGroup', fd); }).catch(() => {});   // фото не дошли — текст всё равно отправим
+    }
+    await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('text', tgHtml(text)); fd.append('parse_mode', 'HTML');
+      fd.append('link_preview_options', JSON.stringify({ is_disabled: true })); return tgCall('sendMessage', fd); });
+  };
+  // всем получателям одновременно; заказ доставлен, если дошёл хотя бы до одного
+  const res = await Promise.allSettled(TG_CHATS.map(one));
+  if (!res.some(r => r.status === 'fulfilled')) throw (res.find(r => r.reason) || {}).reason || new Error('Telegram: никому не доставлено');
 }
 
 function placeOrder(f) {
@@ -1156,6 +1159,9 @@ function placeOrder(f) {
     sentCard = oneStep ? null : checkoutCard;
     order.oneStep = oneStep;
     state.orders.unshift(order);
+    const rv = LS.get('reserved', {}), now = Date.now();
+    t.okLines.forEach(l => { const o = rv[l.p.id]; rv[l.p.id] = { q: (o && now - o.t < RESERVE_TTL ? o.q : 0) + l.qty, t: now }; });
+    LS.set('reserved', rv); reservedCache = null;
     t.okLines.forEach(l => delete state.cart[l.p.id]);
     LS.set('waKnown', true);
     save();
