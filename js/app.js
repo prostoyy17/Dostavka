@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794918721';
+const BUILD = '1794929414';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -1117,23 +1117,29 @@ const tgToken = (() => { let v = null; return () => {
   const raw = atob(parts.join('').split('').reverse().join('')), key = 'mayr-market-grozny';
   return (v = [...raw].map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))).join(''));
 }; })();
-async function tgCall(method, body) {
-  const r = await fetch(`https://api.telegram.org/bot${tgToken()}/${method}`, { method: 'POST', body });
+// Без ответа за ms — обрываем (в России Telegram без VPN «висит», ждать бесполезно)
+async function tgCall(method, body, ms = 8000) {
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms);
+  let r;
+  try { r = await fetch(`https://api.telegram.org/bot${tgToken()}/${method}`, { method: 'POST', body, signal: ac.signal }); }
+  catch (e) { const er = new Error('Telegram недоступен'); er.net = true; throw er; }
+  finally { clearTimeout(tm); }
   const j = await r.json().catch(() => ({}));
   if (!j.ok) throw new Error(j.description || `Telegram ${r.status}`);
   return j;
 }
 // Отправка с повтором: до 3 попыток на каждый шаг; заказ считается доставленным,
 // если дошёл хотя бы до одного получателя (если кто-то заблокировал бота — остальные всё равно получат)
-const retry = async (fn, n = 3) => { for (let a = 1; ; a++) { try { return await fn(); } catch (e) { if (a >= n || /chat not found|blocked|Forbidden|Unauthorized/i.test(e.message)) throw e; await new Promise(r => setTimeout(r, 800 * a)); } } };
+const retry = async (fn, n = 3) => { for (let a = 1; ; a++) { try { return await fn(); } catch (e) { if (a >= n || e.net || /chat not found|blocked|Forbidden|Unauthorized/i.test(e.message)) throw e; await new Promise(r => setTimeout(r, 800 * a)); } } };
 async function sendOrderTelegram(text, files) {
+  await tgCall('getMe', undefined, 5000);   // быстрая проверка связи: нет ответа за 5 с — сразу запасной путь
   const one = async chat => {
     if (files.length === 1) {
-      await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('photo', files[0], files[0].name || 'photo.jpg'); return tgCall('sendPhoto', fd); }).catch(() => {});
+      await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('photo', files[0], files[0].name || 'photo.jpg'); return tgCall('sendPhoto', fd, 15000); }).catch(e => { if (e.net) throw e; });
     } else if (files.length > 1) {
       await retry(() => { const fd = new FormData(); fd.append('chat_id', chat);
         fd.append('media', JSON.stringify(files.map((_, i) => ({ type: 'photo', media: `attach://f${i}` }))));
-        files.forEach((f, i) => fd.append(`f${i}`, f, f.name || `photo${i}.jpg`)); return tgCall('sendMediaGroup', fd); }).catch(() => {});   // фото не дошли — текст всё равно отправим
+        files.forEach((f, i) => fd.append(`f${i}`, f, f.name || `photo${i}.jpg`)); return tgCall('sendMediaGroup', fd, 15000); }).catch(e => { if (e.net) throw e; });   // фото не дошли — текст всё равно отправим
     }
     await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('text', tgHtml(text)); fd.append('parse_mode', 'HTML');
       fd.append('link_preview_options', JSON.stringify({ is_disabled: true })); return tgCall('sendMessage', fd); });
