@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795156320';
+const BUILD = '1795157845';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -841,6 +841,8 @@ function timeSlots() {
 
 // Оформление — обычная отдельная страница (#/checkout), а не всплывающее окно:
 // прокручивается как страница, Safari сам правильно обрабатывает свои панели сверху и снизу.
+const telegramTrial = new URLSearchParams(location.search).get('test') === 'telegram';
+let sendingTrial = false;
 function openCheckout() {
   if (state.route !== 'checkout') { location.hash = '#/checkout'; return; }
   const t = totals();
@@ -910,6 +912,9 @@ function openCheckout() {
         </div>
         ${t.okLines.some(l => l.p.kg) ? `<div class="weight-note">${WEIGHT_NOTE}</div>` : ''}
         <div class="totals" id="checkoutTotals"></div>
+        ${telegramTrial ? `<div class="fieldset"><label>Ключ бота для теста<input id="trialKey" type="password" autocomplete="off" spellcheck="false" required></label>
+          <label>До трёх фото входа<input id="trialPhotos" type="file" accept="image/*" multiple></label>
+          <p>Если файлы не выбраны, используем фотографии из сохранённого адреса.</p><p id="trialStatus" role="status"></p></div>` : ''}
         <button class="btn btn--primary btn--block btn--between" type="submit" id="payBtn"></button>
       </div></div>
     </form>`;
@@ -923,7 +928,7 @@ function openCheckout() {
       <div class="totals__row"><span>${pickup ? 'Самовывоз' : 'Доставка'}</span><b>${tt.delivery ? rub(tt.delivery) : 'Бесплатно'}</b></div>
       ${f.tip && !pickup ? `<div class="totals__row"><span>Чаевые</span><b>${rub(f.tip)}</b></div>` : ''}
       <div class="totals__row totals__row--total"><span>К оплате</span><b>${rub(sum)}</b></div>`;
-    $('#payBtn').innerHTML = `<span class="wa-btn">${svgI('whatsapp', 22)}Подготовить заказ</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
+    $('#payBtn').innerHTML = `<span class="wa-btn">${telegramTrial ? 'Отправить в Telegram' : svgI('whatsapp', 22) + 'Подготовить заказ'}</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
   };
   const drawPay = () => {
     $('#payExtra').innerHTML = f.pay === 'cash' ? `<div class="field"><input name="change" inputmode="numeric" placeholder=" "><label>С какой суммы сдача</label></div>` : '';
@@ -1047,7 +1052,64 @@ function orderMessage(o, f, t) {
 const orderViewLink = o => `${location.origin}${location.pathname}#/z/${o.id}/${o.items.map(i => `${i.id.slice(1)}:${i.qty}`).join(',')}`;
 const waLink = text => `https://wa.me/${ORDER_WHATSAPP}?text=${encodeURIComponent(text)}`;
 
-function placeOrder(f) {
+async function orderCardImage(order, lines) {
+  const W = 1080, PAD = 48, ROW = 156, HEAD = 190, FOOT = 150;
+  const H = HEAD + lines.length * ROW + FOOT;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const font = (w, sz) => `${w} ${sz}px Onest, system-ui, -apple-system, sans-serif`;
+  const load = src => new Promise(res => { if (!src) return res(null); const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; setTimeout(() => res(null), 3000); });
+  const imgs = await Promise.all(lines.map(l => load(/kindar-product\.ru/.test(l.p.img || '') ? null : l.p.img).then(im => im || load(`assets/icons/${l.p.icon}.webp`))));
+  g.fillStyle = '#EEEDE8'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#0033B0'; g.fillRect(0, 0, W, HEAD - 30);
+  g.fillStyle = '#fff'; g.font = font(800, 56); g.fillText(order.id ? `Заказ №${order.id}` : 'Заказ', PAD, 92);
+  g.font = font(500, 30); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText([`${lines.length} поз.`, order.address].filter(Boolean).join(' · ').slice(0, 60), PAD, 138);
+  const clip = (t, max) => { if (g.measureText(t).width <= max) return t; while (t.length && g.measureText(t + '…').width > max) t = t.slice(0, -1); return t + '…'; };
+  lines.forEach((l, k) => {
+    const y = HEAD + k * ROW;
+    g.fillStyle = '#fff'; g.beginPath(); g.roundRect(PAD - 16, y, W - 2 * PAD + 32, ROW - 16, 26); g.fill();
+    const im = imgs[k], box = 116, bx = PAD, by = y + 12;
+    if (im) { const r = Math.min(box / im.width, box / im.height); g.drawImage(im, bx + (box - im.width * r) / 2, by + (box - im.height * r) / 2, im.width * r, im.height * r); }
+    g.fillStyle = '#0E1433'; g.font = font(800, 30); g.fillText(`${k + 1}.`, bx + box + 22, y + 52);
+    g.font = font(600, 30); const nx = bx + box + 70; g.fillText(clip(l.p.name, W - nx - PAD - 10), nx, y + 52);
+    g.font = font(500, 28); g.fillStyle = '#4B5170'; g.fillText(`${fmtQty(l.p, l.qty)} × ${rubP(l.p.price)}${l.p.kg ? '/кг' : ''}`, nx, y + 100);
+    g.font = font(800, 32); g.fillStyle = '#0033B0'; const sum = `${l.p.kg ? '≈' : ''}${rub(l.sum)}`; g.fillText(sum, W - PAD - g.measureText(sum).width, y + 100);
+  });
+  const fy = HEAD + lines.length * ROW + 30;
+  g.fillStyle = '#0E1433'; g.font = font(800, 44); g.fillText(`Итого: ${lines.some(l => l.p.kg) ? '≈' : ''}${rub(order.total)}`, PAD, fy + 50);
+  g.font = font(500, 26); g.fillStyle = '#8E92A6'; g.fillText('MayrMarket · с доставкой', PAD, fy + 92);
+  try {
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+    return blob ? new File([blob], `zakaz${order.id ? "-" + order.id : ""}.jpg`, { type: 'image/jpeg' }) : null;
+  } catch { return null; }   // если какая-то картинка без разрешения — без карточки, только фото дома
+}
+const trialChats = ['8701334852', '552884011'];
+async function deliverTrial(key, chat, files, message) {
+  async function send(method, form) {
+    form.set('chat_id', chat);
+    const response = await fetch(`https://api.telegram.org/bot${key}/${method}`, {
+      method: 'POST', body: form, referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(30000)
+    });
+    if (!response.ok || !(await response.json()).ok) throw new Error('Telegram не подтвердил отправку.');
+  }
+  const album = new FormData();
+  if (files.length === 1) {
+    album.set('photo', files[0]);
+    await send('sendPhoto', album);
+  } else {
+    album.set('media', JSON.stringify(files.map((file, i) => ({ type: 'photo', media: 'attach://photo' + i }))));
+    files.forEach((file, i) => album.set('photo' + i, file));
+    await send('sendMediaGroup', album);
+  }
+  for (const part of message.match(/[\s\S]{1,3900}/gu) || []) {
+    const form = new FormData();
+    form.set('text', part.replace(/\*/g, ''));
+    form.set('link_preview_options', '{"is_disabled":true}');
+    await send('sendMessage', form);
+  }
+}
+
+async function placeOrder(f) {
   const t = totals();
   if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
   const d = new Date();
@@ -1060,6 +1122,57 @@ function placeOrder(f) {
     address: f.pickup ? 'Самовывоз' : `${f.street.trim()}${f.kind === 'flat' && f.apt ? ', кв. ' + f.apt : ''}`
   };
   order.text = orderMessage(order, f, t);
+  const finish = () => {
+    state.orders.unshift(order);
+    const rv = LS.get('reserved', {}), now = Date.now();
+    for (const item of order.items) {
+      const previous = rv[item.id];
+      rv[item.id] = { q: (previous && now - previous.t < RESERVE_TTL ? previous.q : 0) + item.qty, t: now };
+      const remaining = Math.round(((state.cart[item.id] || 0) - item.qty) * 10) / 10;
+      if (remaining > 0) state.cart[item.id] = remaining;
+      else delete state.cart[item.id];
+    }
+    LS.set('reserved', rv);
+    reservedCache = null;
+    save();
+    closeAll();
+    location.hash = '#/orders';
+  };
+  if (telegramTrial) {
+    if (sendingTrial) return;
+    const keyField = $('#trialKey'), status = $('#trialStatus'), btn = $('#payBtn');
+    const key = keyField.value.trim(), photos = Array.from($('#trialPhotos').files);
+    if (!/^9101192609:[A-Za-z0-9_-]{30,}$/.test(key)) { status.textContent = 'Введите ключ MayrMarketBot.'; return; }
+    if (photos.length > 3) { status.textContent = 'Выберите до трёх файлов.'; return; }
+    sendingTrial = true;
+    btn.disabled = true;
+    status.textContent = 'Готовим карточку и фотографии…';
+    try {
+      const start = performance.now();
+      const card = await orderCardImage(order, t.okLines);
+      if (!card) throw new Error('Не удалось собрать карточку товаров.');
+      const pictures = photos.length ? await Promise.all(photos.map(shrinkPhoto)) : savedPhotos().slice(0, 3);
+      const files = [card];
+      for (const [i, picture] of pictures.entries()) {
+        if (!picture || !picture.startsWith('data:image/')) throw new Error('Не удалось прочитать фото входа.');
+        const blob = await (await fetch(picture)).blob();
+        files.push(new File([blob], 'entrance-' + (i + 1) + '.jpg', { type: blob.type }));
+      }
+      const ready = performance.now();
+      status.textContent = 'Отправляем двум получателям…';
+      const result = await Promise.allSettled(trialChats.map(chat => deliverTrial(key, chat, files, order.text)));
+      const received = result.filter(r => r.status === 'fulfilled').length;
+      if (!received) throw new Error('Telegram не подтвердил доставку. Перед повтором проверьте чаты.');
+      const end = performance.now(), seconds = ms => (ms / 1000).toFixed(1);
+      order.trialInfo = `Подготовка: ${seconds(ready-start)} с. Отправка: ${seconds(end-ready)} с. Telegram подтвердил: ${received} из 2.`;
+      order.via = 'tg';
+      keyField.value = '';
+      finish();
+      setTimeout(() => openTracking(order.id), 60);
+    } catch (error) { status.textContent = error.message; }
+    finally { sendingTrial = false; btn.disabled = false; }
+    return;
+  }
   const modal = $('#modal');
   modal.className = 'modal show';
   modal.innerHTML = `
@@ -1083,23 +1196,7 @@ function placeOrder(f) {
       toast('Не удалось скопировать. Откройте WhatsApp по ссылке.');
     }
   };
-  confirm.onclick = () => {
-    confirm.disabled = true;
-    state.orders.unshift(order);
-    const rv = LS.get('reserved', {}), now = Date.now();
-    for (const item of order.items) {
-      const previous = rv[item.id];
-      rv[item.id] = { q: (previous && now - previous.t < RESERVE_TTL ? previous.q : 0) + item.qty, t: now };
-      const remaining = Math.round(((state.cart[item.id] || 0) - item.qty) * 10) / 10;
-      if (remaining > 0) state.cart[item.id] = remaining;
-      else delete state.cart[item.id];
-    }
-    LS.set('reserved', rv);
-    reservedCache = null;
-    save();
-    closeAll();
-    location.hash = '#/orders';
-  };
+  confirm.onclick = () => { confirm.disabled = true; finish(); };
   showOverlay();
 }
 
@@ -1136,6 +1233,7 @@ function openTracking(id) {
       <div class="success">
         <span class="success__icon">${svgI('check', 56)}</span>
         <h2>Заказ №${o.id} отправлен</h2>
+        ${o.trialInfo ? `<p>${esc(o.trialInfo)}</p>` : ''}
         <p>Продавец уже получил заказ. Он проверит наличие и свяжется с вами${o.pay === 'sbp' ? ' — пришлёт оплату по СБП' : ''}.</p>
         <div class="totals" style="margin-top:14px;text-align:left">
           <div class="totals__row"><span>Адрес</span><b>${esc(o.address)}</b></div>
