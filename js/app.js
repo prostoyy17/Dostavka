@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795201324';
+const BUILD = '1795201903';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -25,6 +25,7 @@ const state = {
   theme: LS.get('theme', null),
   route: 'catalog',
   cat: 'all',
+  store: null,
   query: '',
   sub: null,
   filters: new Set(),
@@ -56,7 +57,7 @@ const point = () => POINTS.find(p => p.id === state.point);
 const RESERVE_TTL = 24 * 3600e3;
 let reservedCache = null;
 const reserved = () => { if (reservedCache) return reservedCache; const r = LS.get('reserved', {}), now = Date.now(), out = {}; for (const [id, v] of Object.entries(r)) if (now - v.t < RESERVE_TTL) out[id] = v.q; return (reservedCache = out); };
-const stockOf = (p, pid = state.point || POINTS[0].id) => p ? Math.max(0, Math.round(((p.stock[pid] || 0) - (reserved()[p.id] || 0)) * 10) / 10) : 0;
+const stockOf = (p, pid = state.point || POINTS[0].id) => p ? Math.max(0, Math.round(((p.stock[pid] || 0) - (reserved()[p.id] || 0)) * 1000) / 1000) : 0;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 // Цены везде в целых рублях — копейки не показываем
 const rubP = n => Math.round(n).toLocaleString('ru-RU') + '\u00a0₽';
@@ -107,17 +108,17 @@ function totals() {
 const KG_STEP = 0.5;
 const stepOf = p => p && p.kg ? KG_STEP : 1;
 // сколько можно взять: для весовых — остаток, округлённый вниз до 0,5 кг
-const maxOf = p => { const s = stockOf(p); return p && p.kg ? Math.round(Math.floor(s / KG_STEP + 1e-9) * KG_STEP * 10) / 10 : s; };
+const maxOf = p => { const s = stockOf(p); return p && p.kg && s >= KG_STEP ? Math.floor(s / KG_STEP) * KG_STEP : s; };
 // первое нажатие «+»: 1 кг (или сколько есть, если меньше), штучные — 1 шт
 const firstOf = p => p && p.kg ? Math.min(1, maxOf(p)) : 1;
-const fmtQty = (p, q) => p && p.kg ? `${String(Math.round(q * 10) / 10).replace('.', ',')} кг` : `${q} шт`;
+const fmtQty = (p, q) => p && p.kg ? `${String(q).replace('.', ',')} кг` : `${q} шт`;
 const stepQty = (p, q) => p && p.kg ? Math.round(Math.round(q / KG_STEP) * KG_STEP * 10) / 10 : Math.round(q);
 const WEIGHT_NOTE = 'Весовые товары взвешивают в магазине, поэтому вес и сумма могут немного отличаться.';
 function setQty(id, qty) {
   const p = byId[id];
   const max = maxOf(p);
   const prev = state.cart[id] || 0;
-  qty = Math.max(0, Math.min(stepQty(p, qty), max));
+  qty = Math.max(0, qty >= max ? max : Math.min(stepQty(p, qty), max));
   if (qty === prev && qty >= max && qty > 0) { toast('Больше нет в наличии'); return; }
   if (qty === 0) delete state.cart[id]; else state.cart[id] = qty;
   save();
@@ -158,12 +159,12 @@ function cardHTML(p) {
       <span class="price">${rubP(p.price)}</span>${p.oldPrice > p.price ? `<span class="price-old">${rubP(p.oldPrice)}</span>` : ''}
     </div>
     <div class="card__name" data-open="${p.id}" title="${esc(p.name)}">${esc(p.name)}</div>
-    <div class="card__unit"><span>${p.unit}</span>${s > 0 && s <= 5 ? `<span class="card__low">осталось ${fmtQty(p, s)}</span>` : ''}</div>
+    <div class="card__unit"><span>${esc(STORES[p.offers[0][0]].name)}${p.unit ? ` · ${p.unit}` : ''}</span>${s > 0 && s <= 5 ? `<span class="card__low">осталось ${fmtQty(p, s)}</span>` : ''}</div>
   </article>`;
 }
 function kgPickHTML(p) {
   const q = state.cart[p.id] || 0;
-  return `<div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>≈ ${rubP(Math.round(p.price * q))}</b>` : `${rubP(p.price)} за 1 кг · шаг 0,5 кг`}</div>
+  return `<div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>≈ ${rubP(Math.round(p.price * q))}</b>` : `${rubP(p.price)} за 1 кг · ${maxOf(p) < KG_STEP ? `доступно ${fmtQty(p, maxOf(p))}` : 'шаг 0,5 кг'}`}</div>
     <div class="kgpick__note">${WEIGHT_NOTE}</div>`;
 }
 function refreshQty(id) {
@@ -184,7 +185,7 @@ function parseRoute() {
 /* Память прокрутки: у каждого экрана (и у каждого раздела каталога) своя позиция.
    Ушёл с главной в «Избранное» и вернулся — главная открывается там же, где была. */
 const scrollMem = {};
-const pageKey = () => state.route === 'catalog' ? `catalog:${state.cat}:${state.sub || ''}:${state.query || ''}` : state.route;
+const pageKey = () => state.route === 'catalog' ? `catalog:${state.store ?? "all"}:${state.cat}:${state.sub || ''}:${state.query || ''}` : state.route;
 function rememberScroll() {
   scrollMem[pageKey()] = { y: window.scrollY, limit: state.limit, rows: [...document.querySelectorAll('#page .hrow')].map(r => r.scrollLeft) };
 }
@@ -223,6 +224,7 @@ function renderPage() {
 function filtered() {
   const words = state.query.toLowerCase().replace(/ё/g, 'е').split(/\s+/).filter(Boolean);
   const list = PRODUCTS.filter(p => {
+    if (state.store !== null && !p.offers.some(offer => offer[0] === state.store)) return false;
     if (state.cat !== 'all' && p.cat !== state.cat) return false;
     if (state.sub && p.sub !== state.sub) return false;
     if (words.length && !words.every(w => p.search.includes(w))) return false;
@@ -249,10 +251,16 @@ const sortSelect = (id, val, extra = '') => `<select class="select" id="${id}">
 
 function renderCatalogPage() {
   const page = $('#page');
-  const title = state.query ? `Поиск «${esc(state.query)}»` : state.cat === 'all' ? 'Все товары' : catById[state.cat].name;
-  const home = state.cat === 'all' && !state.query;
+  const title = state.query ? `Поиск «${esc(state.query)}»` : state.cat === 'all' ? (STORES[state.store]?.name || 'Все товары') : catById[state.cat].name;
+  const home = state.cat === 'all' && !state.query && state.store === null;
   page.innerHTML = `
     <div class="circles" id="catStrip"></div>
+    <div class="store-picker" role="group" aria-label="Магазин">
+      ${['Все магазины', ...STORES.map(s => s.name)].map((name, i) => {
+        const selected = state.store === (i ? i - 1 : null);
+        return `<button class="pill ${selected ? 'on' : ''}" aria-pressed="${selected}" data-store="${i - 1}">${esc(name)}</button>`;
+      }).join('')}
+    </div>
     ${home ? '' : `<div class="toolbar"><h1 class="toolbar__title">${title}</h1></div>
     <div class="controls" id="controls"></div>`}
     <div id="catalog"></div>`;
@@ -278,8 +286,8 @@ function renderControls() {
     let menu = '';
     if (state.dd === 'sub') {
       const cnt = {};
-      PRODUCTS.forEach(p => { if (p.cat === c.id) cnt[p.sub] = (cnt[p.sub] || 0) + 1; });
-      const all = PRODUCTS.filter(p => p.cat === c.id).length;
+      PRODUCTS.forEach(p => { if (p.cat === c.id && (state.store === null || p.offers.some(o => o[0] === state.store))) cnt[p.sub] = (cnt[p.sub] || 0) + 1; });
+      const all = Object.values(cnt).reduce((sum, n) => sum + n, 0);
       menu = `<div class="dd__menu">${head('Подраздел')}<div class="dd__scroll">
         <button class="dd__opt ${!state.sub ? 'sel' : ''}" data-sub=""><span>Все</span><em>${all}</em></button>
         ${c.subs.map(s => `<button class="dd__opt ${state.sub === s ? 'sel' : ''}" data-sub="${esc(s)}"><span>${esc(s)}</span><em>${cnt[s] || 0}</em></button>`).join('')}
@@ -302,7 +310,7 @@ function renderCatalog() {
     root.innerHTML = `<div class="empty">${iconBox('search', 'empty__tile')}<div class="empty__title">Ничего не найдено</div><button class="btn btn--ghost btn--sm" data-action="reset">Сбросить фильтры</button></div>`;
     return;
   }
-  const grouped = state.cat === 'all' && !state.query;
+  const grouped = state.cat === 'all' && !state.query && state.store === null;
   if (!grouped) {
     const shown = list.slice(0, state.limit);
     root.innerHTML = `<div class="list-meta">${list.length.toLocaleString('ru-RU')} ${plural(list.length, 'товар', 'товара', 'товаров')}</div><div class="grid">${shown.map(cardHTML).join('')}</div>` +
@@ -760,7 +768,7 @@ function cartHTML() {
           <div class="cart-item__img" style="background:${l.p.img ? '#fff' : catById[l.p.cat].color}" data-open="${l.p.id}">${pic(l.p)}</div>
           <div>
             <div class="cart-item__name">${esc(l.p.name)}</div>
-            <div class="cart-item__meta">${rubP(l.p.price)}${l.p.kg ? ' / кг' : ''}</div>
+            <div class="cart-item__meta">${esc(STORES[l.p.offers[0][0]].name)} · ${rubP(l.p.price)}${l.p.kg ? ' / кг' : ''}</div>
             ${l.ok ? `<div class="cart-item__price">${l.p.kg ? "≈ " : ""}${rubP(l.sum)}</div>`
               : `<div class="cart-item__warn">${l.avail ? `Осталось ${fmtQty(l.p, l.avail)}` : 'Нет в наличии'}</div>`}
           </div>
@@ -1120,7 +1128,7 @@ function orderMessage(o, f, t) {
   L.push(`📦 *ТОВАРЫ — ${t.okLines.length} поз.*`);
   L.push('');
   t.okLines.forEach((l, k) => {
-    L.push(`*${k + 1}.* ${l.p.name}`);
+    L.push(`*${k + 1}.* ${l.p.name} · ${STORES[l.p.offers[0][0]].name}`);
     L.push(`      ${fmtQty(l.p, l.qty)} × ${rubP(l.p.price)}${l.p.kg ? '/кг' : ''} = *${l.p.kg ? '≈' : ''}${rub(l.sum)}*`);
   });
   L.push(line);
@@ -1418,6 +1426,13 @@ document.addEventListener('click', e => {
     return;
   }
   if ((x = el('[data-open]'))) return openProduct(x.dataset.open);
+  if ((x = el('[data-store]'))) {
+    const selected = Number(x.dataset.store);
+    state.store = selected < 0 ? null : selected;
+    state.limit = 60; state.dd = null; state.sub = null;
+    renderPage();
+    return;
+  }
   if ((x = el('[data-cat]'))) { closeAll(); return goCatalog(x.dataset.cat); }
   if ((x = el('[data-filter]'))) {
     const f = x.dataset.filter;
@@ -1455,7 +1470,7 @@ document.addEventListener('click', e => {
     }
     if (a === 'remove-bad') { cartLines().filter(l => !l.ok).forEach(l => l.avail ? state.cart[l.p.id] = l.avail : delete state.cart[l.p.id]); save(); renderAll(); }
     if (a === 'checkout') openCheckout();
-    if (a === 'reset') { state.filters.clear(); state.sub = null; state.query = ''; $('#searchInput').value = ''; goCatalog('all'); }
+    if (a === 'reset') { state.store = null; state.filters.clear(); state.sub = null; state.query = ''; $('#searchInput').value = ''; goCatalog('all'); }
     if (a === 'clear-favs') {
       const backup = [...state.favs];
       state.favs = []; save(); renderPage();

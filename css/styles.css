@@ -949,3 +949,6 @@ body.sticky-header .layout { padding-top: 16px; }
 .kindsw button .phi { opacity: .9; }
 :root[data-theme="dark"] .kindsw { background: var(--surface-2); box-shadow: none; }
 :root[data-theme="dark"] .kindsw button:not(.on) { background: none; color: var(--text-2); }
+
+.store-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.store-picker .pill { width: auto; }
