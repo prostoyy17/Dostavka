@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795162622';
+const BUILD = '1795164068';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -822,32 +822,32 @@ function openProduct(id) {
 }
 
 /* ================= Checkout ================= */
-function timeSlots() {
-  const pt = point();
-  const now = Date.now(), local = cityClock(now);
-  const today = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
-  const dayMs = 24 * 60 * 60 * 1000, hourMs = dayMs / 24;
-  const slots = isOpen(pt, now) ? [{ id: 'asap', title: 'Как можно скорее', sub: state.mode === 'pickup' ? '~10 мин' : pt.eta }] : [];
-  for (let d = 0; d < 2 && slots.length < 15; d++) {
-    for (let h = pt.hours[0]; h < pt.hours[1] && slots.length < 15; h++) {
-      const start = today + d * dayMs + h * hourMs - GROZNY_OFFSET;
-      if (start - now < hourMs) continue;
-      const day = d + Math.floor(h / 24);
-      slots.push({ id: new Date(start).toISOString(), title: `${pad2(h)}:00–${pad2(h + 1)}:00`, sub: ['Сегодня', 'Завтра', 'Послезавтра'][day] });
-    }
+function deliveryWindow(pt, now = Date.now()) {
+  const hour = 3600000, day = 24 * hour;
+  const local = cityClock(now);
+  const midnight = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - GROZNY_OFFSET;
+  let first = Math.ceil((now + hour) / 60000) * 60000;
+  if (!isOpen(pt, first)) {
+    const opening = midnight + pt.hours[0] * hour;
+    first = first <= opening ? opening : opening + day;
   }
-  return slots;
+  const last = midnight + day + pt.hours[1] * hour - 60000;
+  return { first, last };
 }
+const cityDateInput = timestamp => cityClock(timestamp).toISOString().slice(0, 16);
 
 // Оформление — обычная отдельная страница (#/checkout), а не всплывающее окно:
 // прокручивается как страница, Safari сам правильно обрабатывает свои панели сверху и снизу.
 let sendingOrder = false;
-function openCheckout(selectedPhotos = []) {
+function openCheckout(selectedPhotos = [], timeChoice = null) {
   if (state.route !== 'checkout') { location.hash = '#/checkout'; return; }
   const t = totals();
   if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
-  const slots = timeSlots();
-  const f = { ...state.address, slot: slots[0].id, pay: 'sbp', tip: 0 };
+  const availableNow = isOpen(t.pt);
+  const { first, last } = deliveryWindow(t.pt);
+  let scheduled = !availableNow || Boolean(timeChoice?.scheduled);
+  const customValue = timeChoice?.value || cityDateInput(first);
+  const f = { ...state.address, slot: 'asap', pay: 'sbp', tip: 0 };
   // имя и телефон из аккаунта, если в заказах их ещё не вводили
   if (state.user) { if (!f.name) f.name = state.user.name || ''; if (!f.phone) f.phone = state.user.phone || ''; }
   const flat = f.kind === 'flat';   // тип адреса: частный дом или квартира/офис
@@ -889,7 +889,13 @@ function openCheckout(selectedPhotos = []) {
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">3</span>Время по Грозному</div>
-          <div class="slots">${slots.map(s => `<button type="button" class="slot ${s.id === f.slot ? 'active' : ''}" data-slot="${s.id}">${s.title}<small>${s.sub}</small></button>`).join('')}</div>
+          <div class="slots">
+            ${availableNow ? `<button type="button" class="slot ${scheduled ? '' : 'active'}" data-slot="asap" aria-pressed="${!scheduled}">Как можно скорее<small>${pickup ? '~10 мин' : pt.eta}</small></button>` : ''}
+            <button type="button" class="slot ${scheduled ? 'active' : ''}" data-slot="custom" aria-pressed="${scheduled}">Выбрать время</button>
+          </div>
+          <div id="schedulePicker" ${scheduled ? '' : 'hidden'}>
+            <div class="field"><input id="deliveryTime" type="datetime-local" name="deliveryTime" value="${esc(customValue)}" min="${cityDateInput(first)}" max="${cityDateInput(last)}"><label for="deliveryTime">Дата и время</label></div>
+          </div>
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">4</span>Оплата</div>
@@ -961,7 +967,7 @@ function openCheckout(selectedPhotos = []) {
       <div class="totals__row"><span>${pickup ? 'Самовывоз' : 'Доставка'}</span><b>${tt.delivery ? rub(tt.delivery) : 'Бесплатно'}</b></div>
       ${f.tip && !pickup ? `<div class="totals__row"><span>Чаевые</span><b>${rub(f.tip)}</b></div>` : ''}
       <div class="totals__row totals__row--total"><span>К оплате</span><b>${rub(sum)}</b></div>`;
-    $('#payBtn').innerHTML = `<span class="wa-btn">Отправить заказ в Telegram</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
+    $('#payBtn').innerHTML = `<span class="wa-btn">Отправить заказ</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
   };
   const drawPay = () => {
     $('#payExtra').innerHTML = f.pay === 'cash' ? `<div class="field"><input name="change" inputmode="numeric" placeholder=" "><label>С какой суммы сдача</label></div>` : '';
@@ -969,7 +975,14 @@ function openCheckout(selectedPhotos = []) {
   drawPay(); drawTotals();
   form.onclick = e => {
     const s = e.target.closest('[data-slot]'), p = e.target.closest('[data-pay]'), tp = e.target.closest('[data-tip]');
-    if (s) { f.slot = s.dataset.slot; $$('[data-slot]', form).forEach(b => b.classList.toggle('active', b === s)); }
+    if (s) {
+      scheduled = s.dataset.slot === 'custom';
+      $('#schedulePicker').hidden = !scheduled;
+      $$('[data-slot]', form).forEach(b => {
+        b.classList.toggle('active', b === s);
+        b.setAttribute('aria-pressed', String(b === s));
+      });
+    }
     if (p) { f.pay = p.dataset.pay; $$('[data-pay]', form).forEach(b => b.classList.toggle('active', b === p)); drawPay(); drawTotals(); }
     const kd = e.target.closest('[data-kind]');
     if (kd && kd.dataset.kind !== (f.kind || 'house')) {
@@ -978,14 +991,14 @@ function openCheckout(selectedPhotos = []) {
       state.address.kind = kd.dataset.kind;
       state.address.comment = d.comment || '';
       const y = window.scrollY;
-      slideKind(kd, () => { openCheckout(selectedPhotos); window.scrollTo(0, y); });
+      slideKind(kd, () => { openCheckout(selectedPhotos, { scheduled, value: form.elements.deliveryTime.value }); window.scrollTo(0, y); });
       return;
     }
     const sw = e.target.closest('[data-mode-sw]');
     if (sw && sw.dataset.modeSw !== state.mode) {
       const d = Object.fromEntries(new FormData(form));
       state.address = { ...state.address, ...['street', 'house', 'apt', 'entrance', 'floor', 'code', 'zone', 'name', 'phone', 'landmark'].reduce((o, k) => (d[k] !== undefined ? (o[k] = d[k], o) : o), {}) };
-      state.mode = sw.dataset.modeSw; openCheckout(selectedPhotos); return;
+      state.mode = sw.dataset.modeSw; openCheckout(selectedPhotos, { scheduled, value: form.elements.deliveryTime.value }); return;
     }
     if (tp) { f.tip = +tp.dataset.tip; $$('[data-tip]', form).forEach(b => b.classList.toggle('active', b === tp)); drawTotals(); }
   };
@@ -1012,12 +1025,19 @@ function openCheckout(selectedPhotos = []) {
     if (!pickup) { if (!data.street?.trim()) err('street', 'Укажите улицу и дом'); else if (!/\d/.test(data.street)) err('street', 'Добавьте номер дома, например: Кадырова, 12'); if (flat && !data.apt?.trim()) err('apt', 'Укажите квартиру'); }
     if (!data.name?.trim()) err('name', 'Укажите имя');
     if ((data.phone || '').replace(/\D/g, '').length !== 11) err('phone', 'Номер полностью');
+    const now = Date.now();
+    if (scheduled) {
+      const time = Date.parse(data.deliveryTime + '+03:00');
+      const window = deliveryWindow(pt, now);
+      if (!Number.isFinite(time) || time < window.first || time > window.last || !isOpen(pt, time)) {
+        err('deliveryTime', `Выберите время в часы работы (${hours(pt)}), минимум за час до доставки.`);
+      } else f.slot = new Date(time).toISOString();
+    } else if (!isOpen(pt, now)) {
+      $('[data-slot="asap"]', form).hidden = true;
+      $('[data-slot="custom"]', form).click();
+      err('deliveryTime', 'Выберите время доставки.');
+    } else f.slot = 'asap';
     if (first) { first.focus(); toast('Проверьте поля'); return; }
-    if (!timeSlots().some(slot => slot.id === f.slot)) {
-      openCheckout(selectedPhotos);
-      toast('Выбранное время уже недоступно. Выберите другое.');
-      return;
-    }
 
     state.address = { ...state.address, kind: flat ? 'flat' : 'house', name: data.name, phone: data.phone, ...(pickup ? {} : { comment: data.comment || '', street: data.street.trim(), house: '', apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
     LS.set('address', state.address);
@@ -1078,11 +1098,9 @@ function orderMessage(o, f, t) {
   if (!f.pickup) L.push(`Доставка: ${t.delivery ? rub(t.delivery) : 'бесплатно'}`);
   if (f.tip && !f.pickup) L.push(`Чаевые: ${rub(f.tip)}`);
   L.push(`💰 *ИТОГО: ${kg ? '≈' : ''}${rub(o.total)}*`);
-  L.push('', '🖼 *Фото всех товаров:*', orderViewLink(o));
   return L.join('\n');
 }
 
-const orderViewLink = o => `https://prostoyy17.github.io/Dostavka/#/z/${o.id}/${o.items.map(i => `${i.id.slice(1)}:${i.qty}`).join(',')}`;
 const waLink = text => `https://wa.me/${ORDER_WHATSAPP}?text=${encodeURIComponent(text)}`;
 
 async function orderCardImage(order, lines) {
@@ -1149,9 +1167,8 @@ async function placeOrder(f, addressPhotos, photos) {
   const status = $('#sendStatus'), btn = $('#payBtn');
   sendingOrder = true;
   btn.disabled = true;
-  status.textContent = 'Готовим карточку и фотографии…';
+  status.textContent = 'Отправляем заказ…';
   try {
-    const start = performance.now();
     const card = await orderCardImage(order, t.okLines);
     if (!card) throw new Error('Не удалось собрать карточку товаров.');
     const pictures = photos.length ? await Promise.all(photos.map(shrinkPhoto)) : addressPhotos;
@@ -1161,16 +1178,12 @@ async function placeOrder(f, addressPhotos, photos) {
       const blob = await (await fetch(picture)).blob();
       files.push(new File([blob], 'entrance-' + (i + 1) + '.jpg', { type: blob.type }));
     }
-    const ready = performance.now();
-    status.textContent = 'Отправляем двум получателям…';
     const form = new FormData();
     form.set('message', order.text);
     for (const file of files) form.append('photo', file);
     const response = await fetch('https://mayrmarket-order-test.zanyburl3.chatgpt.site/orders', {method:'POST', body:form, signal:AbortSignal.timeout(100000)});
     const received = response.ok ? (await response.json()).received : 0;
-    if (!received) throw new Error('Telegram не подтвердил доставку. Перед повтором проверьте чаты.');
-    const end = performance.now(), seconds = ms => (ms / 1000).toFixed(1);
-    order.trialInfo = `Подготовка: ${seconds(ready-start)} с. Отправка: ${seconds(end-ready)} с. Telegram подтвердил: ${received} из 2.`;
+    if (!received) throw new Error('Не удалось подтвердить отправку заказа.');
     order.via = 'tg';
     finish();
     setTimeout(() => openTracking(order.id), 60);
@@ -1211,7 +1224,6 @@ function openTracking(id) {
       <div class="success">
         <span class="success__icon">${svgI('check', 56)}</span>
         <h2>Заказ №${o.id} отправлен</h2>
-        ${o.trialInfo ? `<p>${esc(o.trialInfo)}</p>` : ''}
         <p>Продавец уже получил заказ. Он проверит наличие и свяжется с вами${o.pay === 'sbp' ? ' — пришлёт оплату по СБП' : ''}.</p>
         <div class="totals" style="margin-top:14px;text-align:left">
           <div class="totals__row"><span>Адрес</span><b>${esc(o.address)}</b></div>
