@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795164068';
+const BUILD = '1795164559';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -846,6 +846,15 @@ function openCheckout(selectedPhotos = [], timeChoice = null) {
   const availableNow = isOpen(t.pt);
   const { first, last } = deliveryWindow(t.pt);
   let scheduled = !availableNow || Boolean(timeChoice?.scheduled);
+  const today = cityDateInput(Date.now()).slice(0, 10);
+  const tomorrow = cityDateInput(Date.now() + 86400000).slice(0, 10);
+  const days = [];
+  const lastDay = cityDateInput(last).slice(0, 10);
+  for (let stamp = Date.parse(cityDateInput(first).slice(0, 10) + 'T00:00:00+03:00'); cityDateInput(stamp).slice(0, 10) <= lastDay; stamp += 86400000) {
+    const date = cityDateInput(stamp).slice(0, 10);
+    const label = date === today ? 'Сегодня' : date === tomorrow ? 'Завтра' : new Date(stamp).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', timeZone: GROZNY_TIMEZONE });
+    days.push({date, label});
+  }
   const customValue = timeChoice?.value || cityDateInput(first);
   const f = { ...state.address, slot: 'asap', pay: 'sbp', tip: 0 };
   // имя и телефон из аккаунта, если в заказах их ещё не вводили
@@ -894,13 +903,17 @@ function openCheckout(selectedPhotos = [], timeChoice = null) {
             <button type="button" class="slot ${scheduled ? 'active' : ''}" data-slot="custom" aria-pressed="${scheduled}">Выбрать время</button>
           </div>
           <div id="schedulePicker" ${scheduled ? '' : 'hidden'}>
-            <div class="field"><input id="deliveryTime" type="datetime-local" name="deliveryTime" value="${esc(customValue)}" min="${cityDateInput(first)}" max="${cityDateInput(last)}"><label for="deliveryTime">Дата и время</label></div>
+            <div class="delivery-when">
+              <label>День<select name="deliveryDay">${days.map(({date, label}) => `<option value="${date}" ${date === customValue.slice(0, 10) ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+              <label>Время<input id="deliveryTime" name="deliveryTime" type="time" required value="${esc(customValue.slice(11))}"></label>
+            </div>
+            <small id="timeError" role="status"></small>
           </div>
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">4</span>Оплата</div>
           <div class="opts">
-            ${[['sbp', 'qr', 'СБП', 'После подтверждения заказа'], ['cash', 'cash', 'Наличными', 'При получении']]
+            ${[['sbp', 'qr', 'СБП', 'При получении'], ['cash', 'cash', 'Наличными', 'При получении']]
               .map(([id, icon, ti, su]) => `<button type="button" class="opt ${f.pay === id ? 'active' : ''}" data-pay="${id}">${svgI(icon, 24)}<span class="opt__title">${ti}</span><span class="opt__sub">${su}</span></button>`).join('')}
           </div>
           <div id="payExtra"></div>
@@ -929,6 +942,19 @@ function openCheckout(selectedPhotos = [], timeChoice = null) {
     </form>`;
 
   const form = $('#checkoutForm');
+  const selectedTime = () => form.elements.deliveryDay.value + 'T' + form.elements.deliveryTime.value;
+  form.elements.deliveryDay.onchange = () => {
+    const date = form.elements.deliveryDay.value;
+    const choice = Date.parse(selectedTime() + '+03:00');
+    if (!Number.isFinite(choice) || choice < first || choice > last || !isOpen(pt, choice)) {
+      const midnight = Date.parse(date + 'T00:00:00+03:00');
+      const opening = midnight + pt.hours[0] * 3600000;
+      const preferred = opening > last ? midnight : opening;
+      form.elements.deliveryTime.value = cityDateInput(Math.max(preferred, first)).slice(11);
+    }
+    $('#timeError').textContent = '';
+  };
+  form.elements.deliveryTime.oninput = () => { $('#timeError').textContent = ''; };
   const photoList = $('#checkoutPhotos', form);
   if (photoList && addressPhotos.length) {
     photoList.innerHTML = addressPhotos.map((url, i) =>
@@ -991,14 +1017,14 @@ function openCheckout(selectedPhotos = [], timeChoice = null) {
       state.address.kind = kd.dataset.kind;
       state.address.comment = d.comment || '';
       const y = window.scrollY;
-      slideKind(kd, () => { openCheckout(selectedPhotos, { scheduled, value: form.elements.deliveryTime.value }); window.scrollTo(0, y); });
+      slideKind(kd, () => { openCheckout(selectedPhotos, { scheduled, value: selectedTime() }); window.scrollTo(0, y); });
       return;
     }
     const sw = e.target.closest('[data-mode-sw]');
     if (sw && sw.dataset.modeSw !== state.mode) {
       const d = Object.fromEntries(new FormData(form));
       state.address = { ...state.address, ...['street', 'house', 'apt', 'entrance', 'floor', 'code', 'zone', 'name', 'phone', 'landmark'].reduce((o, k) => (d[k] !== undefined ? (o[k] = d[k], o) : o), {}) };
-      state.mode = sw.dataset.modeSw; openCheckout(selectedPhotos, { scheduled, value: form.elements.deliveryTime.value }); return;
+      state.mode = sw.dataset.modeSw; openCheckout(selectedPhotos, { scheduled, value: selectedTime() }); return;
     }
     if (tp) { f.tip = +tp.dataset.tip; $$('[data-tip]', form).forEach(b => b.classList.toggle('active', b === tp)); drawTotals(); }
   };
@@ -1018,6 +1044,7 @@ function openCheckout(selectedPhotos = [], timeChoice = null) {
       const el = form.elements[name];
       if (!el) return;
       first = first || el;
+      if (name === 'deliveryTime') { $('#timeError').textContent = msg; return; }
       const fld = el.closest('.field');
       if (fld) { fld.classList.add('error'); if (!fld.querySelector('.field__err')) fld.insertAdjacentHTML('beforeend', `<div class="field__err">${msg}</div>`); }
       else el.classList.add('bad');
@@ -1027,7 +1054,7 @@ function openCheckout(selectedPhotos = [], timeChoice = null) {
     if ((data.phone || '').replace(/\D/g, '').length !== 11) err('phone', 'Номер полностью');
     const now = Date.now();
     if (scheduled) {
-      const time = Date.parse(data.deliveryTime + '+03:00');
+      const time = Date.parse(selectedTime() + '+03:00');
       const window = deliveryWindow(pt, now);
       if (!Number.isFinite(time) || time < window.first || time > window.last || !isOpen(pt, time)) {
         err('deliveryTime', `Выберите время в часы работы (${hours(pt)}), минимум за час до доставки.`);
@@ -1137,11 +1164,11 @@ async function orderCardImage(order, lines) {
 async function placeOrder(f, addressPhotos, photos) {
   const t = totals();
   if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
-  const d = new Date();
-  const random = crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
-  const id = `${pad2(d.getDate())}${pad2(d.getMonth() + 1)}-${random}`;
+  const createdAt = Date.now();
+  const suffix = crypto.getRandomValues(new Uint32Array(1))[0] % 100000;
+  const id = String(Math.floor(createdAt / 1000)) + String(suffix).padStart(5, '0');
   const order = {
-    id, createdAt: Date.now(), point: state.point, mode: f.pickup ? 'pickup' : 'delivery', via: 'tg',
+    id, createdAt, point: state.point, mode: f.pickup ? 'pickup' : 'delivery', via: 'tg',
     items: t.okLines.map(l => ({ id: l.p.id, name: l.p.name, qty: l.qty, price: l.p.price, offers: l.p.offers })),
     total: t.total + (f.pickup ? 0 : f.tip), pay: f.pay, slot: f.slot,
     address: f.pickup ? 'Самовывоз' : `${f.street.trim()}${f.kind === 'flat' && f.apt ? ', кв. ' + f.apt : ''}`
@@ -1224,7 +1251,7 @@ function openTracking(id) {
       <div class="success">
         <span class="success__icon">${svgI('check', 56)}</span>
         <h2>Заказ №${o.id} отправлен</h2>
-        <p>Продавец уже получил заказ. Он проверит наличие и свяжется с вами${o.pay === 'sbp' ? ' — пришлёт оплату по СБП' : ''}.</p>
+        <p>Продавец уже получил заказ. Он проверит наличие и свяжется с вами${o.pay === 'sbp' ? ' — оплата по СБП при получении' : ''}.</p>
         <div class="totals" style="margin-top:14px;text-align:left">
           <div class="totals__row"><span>Адрес</span><b>${esc(o.address)}</b></div>
           <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
