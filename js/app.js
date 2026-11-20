@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1794929414';
+const BUILD = '1795156320';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -60,8 +60,14 @@ const rubP = n => Math.round(n).toLocaleString('ru-RU') + '\u00a0₽';
 const pic = (p, cls = 'ic') => p.img ? `<img class="${cls} photo" src="${p.img}" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.className='${cls}';this.src='assets/icons/${p.icon}.webp'">` : ic(p.icon, cls);
 const pad2 = n => String(n % 24).padStart(2, '0');
 // hours: [открытие, закрытие]; закрытие больше 24 означает «после полуночи» (25 = 01:00 ночи)
-const isOpen = pt => { const h = new Date().getHours(), [a, b] = pt.hours; return (h >= a && h < b) || (b > 24 && h < b - 24); };
-const opensToday = pt => new Date().getHours() < pt.hours[0];
+const GROZNY_TIMEZONE = 'Europe/Moscow';
+const GROZNY_OFFSET = 3 * 60 * 60 * 1000;
+const cityClock = (now = Date.now()) => new Date(now + GROZNY_OFFSET);
+const isOpen = (pt, now) => {
+  const h = cityClock(now).getUTCHours(), [opens, closes] = pt.hours;
+  return (h >= opens && h < closes) || (closes > 24 && h < closes - 24);
+};
+const opensToday = pt => cityClock().getUTCHours() < pt.hours[0];
 const hours = pt => `${pad2(pt.hours[0])}:00–${pad2(pt.hours[1])}:00`;
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c; };
 const heart = svgI('heart-o', 20, 'h-off') + svgI('heart', 20, 'h-on');
@@ -387,7 +393,6 @@ const shrinkPhoto = file => new Promise(res => {
   im.onerror = () => { URL.revokeObjectURL(url); res(null); };
   im.src = url;
 });
-const dataUrlToFile = (d, name) => { const [h, b] = d.split(','), bin = atob(b), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new File([u], name, { type: h.match(/:(.*?);/)[1] }); };
 const savedPhotos = () => LS.get('addrPhotos', []);
 const saveHousePhotos = list => { try { localStorage.setItem('s95_addrPhotos', JSON.stringify(list)); return true; } catch { toast('Не хватает места в телефоне для фото'); return false; } };
 const photoTiles = (list, max = 3) => list.map((u, i) => `<div class="photos__item"><img src="${u}" alt=""><button type="button" data-ph-del="${i}" aria-label="Удалить">${svgI('x', 14)}</button></div>`).join('')
@@ -424,7 +429,7 @@ function renderAddress() {
         <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
         <div class="field"><textarea name="comment" placeholder=" ">${esc(f.comment || '')}</textarea><label>Комментарий курьеру</label></div>
         <div class="photos">
-          <div class="photos__title">Фото дома или входа <span>до 3 фото, будут прикрепляться к заказам</span></div>
+          <div class="photos__title">Фото дома или входа <span>до 3 фото, хранятся на этом устройстве</span></div>
           <div class="photos__list" id="accPhotoList"></div>
           <input type="file" id="accPhotoInput" accept="image/*" multiple hidden>
         </div>
@@ -664,8 +669,8 @@ function renderOrders() {
       const pt = POINTS.find(p => p.id === o.point) || POINTS[0];
       return `<div class="order">
         <div class="order__head">
-          <div><div class="order__num">№${o.id} · ${pt.city}</div><div class="order__date">${new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} · ${o.mode === 'pickup' ? 'самовывоз' : o.address}</div></div>
-          <span class="order__status ${st === 3 ? 'done' : ''}">${o.via === 'tg' ? 'Отправлен продавцу' : o.via === 'wa' ? 'Отправлен в WhatsApp' : steps[st][1]}</span>
+          <div><div class="order__num">№${o.id} · ${pt.city}</div><div class="order__date">${new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} · ${o.mode === 'pickup' ? 'самовывоз' : esc(o.address)}</div></div>
+          <span class="order__status ${st === 3 ? 'done' : ''}">${o.via === 'tg' ? 'Отправлен продавцу' : o.via === 'wa' ? 'Через WhatsApp' : steps[st][1]}</span>
         </div>
         <div class="order__icons">${o.items.slice(0, 7).map(i => byId[i.id] ? `<span style="background:${byId[i.id].img ? '#fff' : catById[byId[i.id].cat].color}">${pic(byId[i.id])}</span>` : '').join('')}${o.items.length > 7 ? `<em>+${o.items.length - 7}</em>` : ''}</div>
         <div class="order__foot">
@@ -819,14 +824,16 @@ function openProduct(id) {
 /* ================= Checkout ================= */
 function timeSlots() {
   const pt = point();
-  const slots = [{ id: 'asap', title: 'Как можно скорее', sub: state.mode === 'pickup' ? '~10 мин' : pt.eta }];
-  const now = new Date();
+  const now = Date.now(), local = cityClock(now);
+  const today = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
+  const dayMs = 24 * 60 * 60 * 1000, hourMs = dayMs / 24;
+  const slots = isOpen(pt, now) ? [{ id: 'asap', title: 'Как можно скорее', sub: state.mode === 'pickup' ? '~10 мин' : pt.eta }] : [];
   for (let d = 0; d < 2 && slots.length < 15; d++) {
     for (let h = pt.hours[0]; h < pt.hours[1] && slots.length < 15; h++) {
-      const start = new Date(now); start.setDate(now.getDate() + d); start.setHours(h, 0, 0, 0);
-      if (start - now < 60 * 60 * 1000) continue;
-      const day = Math.round((new Date(start).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 864e5);
-      slots.push({ id: start.toISOString(), title: `${pad2(h)}:00–${pad2(h + 1)}:00`, sub: ['Сегодня', 'Завтра', 'Послезавтра'][day] || start.toLocaleDateString('ru-RU') });
+      const start = today + d * dayMs + h * hourMs - GROZNY_OFFSET;
+      if (start - now < hourMs) continue;
+      const day = d + Math.floor(h / 24);
+      slots.push({ id: new Date(start).toISOString(), title: `${pad2(h)}:00–${pad2(h + 1)}:00`, sub: ['Сегодня', 'Завтра', 'Послезавтра'][day] });
     }
   }
   return slots;
@@ -838,7 +845,8 @@ function openCheckout() {
   if (state.route !== 'checkout') { location.hash = '#/checkout'; return; }
   const t = totals();
   if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
-  const f = { slot: 'asap', pay: 'sbp', tip: 0, ...state.address };
+  const slots = timeSlots();
+  const f = { ...state.address, slot: slots[0].id, pay: 'sbp', tip: 0 };
   // имя и телефон из аккаунта, если в заказах их ещё не вводили
   if (state.user) { if (!f.name) f.name = state.user.name || ''; if (!f.phone) f.phone = state.user.phone || ''; }
   const flat = f.kind === 'flat';   // тип адреса: частный дом или квартира/офис
@@ -863,23 +871,18 @@ function openCheckout() {
             <div class="field"><input name="code" placeholder=" " value="${esc(f.code || '')}"><label>Домофон</label></div>
           </div>` : ''}
           <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
-          <div class="field"><textarea name="comment" placeholder=" ">${esc(f.comment || '')}</textarea><label>Комментарий курьеру</label></div>
-          ${HOUSE_PHOTOS ? `<div class="photos">
-            <div class="photos__title">Фото дома или входа <span>до 3 фото, по желанию</span></div>
-            <div class="photos__list" id="photoList"></div>
-            <input type="file" id="photoInput" accept="image/*" multiple hidden>
-          </div>` : ''}`}
+          <div class="field"><textarea name="comment" placeholder=" ">${esc(f.comment || '')}</textarea><label>Комментарий курьеру</label></div>`}
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">2</span>Контакты</div>
           <div class="row row--2">
-            <div class="field"><input name="name" placeholder=" " value="${f.name || ''}" autocomplete="given-name"><label>Имя</label></div>
-            <div class="field"><input name="phone" type="tel" placeholder=" " value="${f.phone || ''}" autocomplete="tel"><label>Телефон</label></div>
+            <div class="field"><input name="name" placeholder=" " value="${esc(f.name || '')}" autocomplete="given-name"><label>Имя</label></div>
+            <div class="field"><input name="phone" type="tel" placeholder=" " value="${esc(f.phone || '')}" autocomplete="tel"><label>Телефон</label></div>
           </div>
         </div>
         <div class="fieldset">
-          <div class="fieldset__title"><span class="fieldset__num">3</span>Время</div>
-          <div class="slots">${timeSlots().map(s => `<button type="button" class="slot ${s.id === f.slot ? 'active' : ''}" data-slot="${s.id}">${s.title}<small>${s.sub}</small></button>`).join('')}</div>
+          <div class="fieldset__title"><span class="fieldset__num">3</span>Время по Грозному</div>
+          <div class="slots">${slots.map(s => `<button type="button" class="slot ${s.id === f.slot ? 'active' : ''}" data-slot="${s.id}">${s.title}<small>${s.sub}</small></button>`).join('')}</div>
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">4</span>Оплата</div>
@@ -920,37 +923,16 @@ function openCheckout() {
       <div class="totals__row"><span>${pickup ? 'Самовывоз' : 'Доставка'}</span><b>${tt.delivery ? rub(tt.delivery) : 'Бесплатно'}</b></div>
       ${f.tip && !pickup ? `<div class="totals__row"><span>Чаевые</span><b>${rub(f.tip)}</b></div>` : ''}
       <div class="totals__row totals__row--total"><span>К оплате</span><b>${rub(sum)}</b></div>`;
-    $('#payBtn').innerHTML = `<span class="wa-btn">${typeof TG_BOT_KEY !== 'undefined' ? '' : svgI('whatsapp', 22)}Отправить заказ</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
+    $('#payBtn').innerHTML = `<span class="wa-btn">${svgI('whatsapp', 22)}Подготовить заказ</span><span>${tt.okLines.some(l => l.p.kg) ? '≈ ' : ''}${rub(sum)}</span>`;
   };
   const drawPay = () => {
-    $('#payExtra').innerHTML = f.pay === 'card' ? `<div class="card-form">
-        <input name="cardNum" inputmode="numeric" placeholder="Номер карты" maxlength="19" autocomplete="cc-number">
-        <div class="row row--2" style="grid-template-columns:1fr 1fr"><input name="cardExp" inputmode="numeric" placeholder="ММ/ГГ" maxlength="5" autocomplete="cc-exp"><input name="cardCvc" inputmode="numeric" placeholder="CVC" maxlength="3" type="password" autocomplete="cc-csc"></div>
-      </div>`
-      : f.pay === 'cash' ? `<div class="field"><input name="change" inputmode="numeric" placeholder=" "><label>С какой суммы сдача</label></div>` : '';
+    $('#payExtra').innerHTML = f.pay === 'cash' ? `<div class="field"><input name="change" inputmode="numeric" placeholder=" "><label>С какой суммы сдача</label></div>` : '';
   };
   drawPay(); drawTotals();
-  // фото дома: до 3 штук, хранятся только в памяти до отправки
-  const drawPhotos = () => {
-    $('#photoList').innerHTML = orderPhotos.map((ph, i) => `<div class="photos__item"><img src="${ph.url}" alt=""><button type="button" data-photo-del="${i}" aria-label="Удалить">${svgI('x', 14)}</button></div>`).join('')
-      + (orderPhotos.length < 3 ? `<button type="button" class="photos__add" data-photo-add>${svgI('plus', 22)}<span>Добавить</span></button>` : '');
-  };
-  if (HOUSE_PHOTOS && !orderPhotos.length) orderPhotos = savedPhotos().map((d, i) => ({ file: dataUrlToFile(d, `dom${i + 1}.jpg`), url: d, saved: true }));
-  if (HOUSE_PHOTOS) drawPhotos();
-  checkoutCard = null; orderCardImage({ total: t.total }, t.okLines).then(file => { checkoutCard = file; });
-  if (HOUSE_PHOTOS) $('#photoInput').onchange = e => {
-    [...e.target.files].slice(0, 3 - orderPhotos.length).forEach(file => orderPhotos.push({ file, url: URL.createObjectURL(file) }));
-    if (e.target.files.length > 3) toast('Можно добавить до 3 фото');
-    e.target.value = ''; drawPhotos();
-  };
-
   form.onclick = e => {
     const s = e.target.closest('[data-slot]'), p = e.target.closest('[data-pay]'), tp = e.target.closest('[data-tip]');
     if (s) { f.slot = s.dataset.slot; $$('[data-slot]', form).forEach(b => b.classList.toggle('active', b === s)); }
     if (p) { f.pay = p.dataset.pay; $$('[data-pay]', form).forEach(b => b.classList.toggle('active', b === p)); drawPay(); drawTotals(); }
-    if (e.target.closest('[data-photo-add]')) { $('#photoInput').click(); return; }
-    const del = e.target.closest('[data-photo-del]');
-    if (del) { const [ph] = orderPhotos.splice(+del.dataset.photoDel, 1); URL.revokeObjectURL(ph.url); drawPhotos(); return; }
     const kd = e.target.closest('[data-kind]');
     if (kd && kd.dataset.kind !== (f.kind || 'house')) {
       const d = Object.fromEntries(new FormData(form));
@@ -972,9 +954,7 @@ function openCheckout() {
   form.oninput = e => {
     const el = e.target;
     if (el.name === 'phone') el.value = maskPhone(el.value);
-    if (el.name === 'cardNum') el.value = el.value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ');
-    if (el.name === 'cardExp') { let v = el.value.replace(/\D/g, '').slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2); el.value = v; }
-    if (el.name === 'cardCvc' || el.name === 'change') el.value = el.value.replace(/\D/g, '');
+    if (el.name === 'change') el.value = el.value.replace(/\D/g, '');
     el.classList.remove('bad');
     const fld = el.closest('.field');
     if (fld) { fld.classList.remove('error'); fld.querySelector('.field__err')?.remove(); }
@@ -994,12 +974,12 @@ function openCheckout() {
     if (!pickup) { if (!data.street?.trim()) err('street', 'Укажите улицу и дом'); else if (!/\d/.test(data.street)) err('street', 'Добавьте номер дома, например: Кадырова, 12'); if (flat && !data.apt?.trim()) err('apt', 'Укажите квартиру'); }
     if (!data.name?.trim()) err('name', 'Укажите имя');
     if ((data.phone || '').replace(/\D/g, '').length !== 11) err('phone', 'Номер полностью');
-    if (f.pay === 'card') {
-      if ((data.cardNum || '').replace(/\D/g, '').length !== 16) err('cardNum');
-      if (!/^(0[1-9]|1[0-2])\/\d\d$/.test(data.cardExp || '')) err('cardExp');
-      if ((data.cardCvc || '').length !== 3) err('cardCvc');
-    }
     if (first) { first.focus(); toast('Проверьте поля'); return; }
+    if (!timeSlots().some(slot => slot.id === f.slot)) {
+      openCheckout();
+      toast('Выбранное время уже недоступно. Выберите другое.');
+      return;
+    }
 
     state.address = { ...state.address, kind: flat ? 'flat' : 'house', name: data.name, phone: data.phone, ...(pickup ? {} : { comment: data.comment || '', street: data.street.trim(), house: '', apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
     LS.set('address', state.address);
@@ -1021,11 +1001,7 @@ function maskPhone(v) {
   return out;
 }
 
-// Заказ уходит продавцу в WhatsApp готовым сообщением (без сервера)
-let orderPhotos = [], sentPhotos = [], sentCard = null, checkoutCard = null;
-// Фото дома и отправка файлами — включим, когда будет сервер (тогда всё уйдёт одним сообщением автоматически)
-const HOUSE_PHOTOS = true, SHARE_FILES = false;   // фото дома: в форме и после отправки (для «Отправить фото»)
-function orderMessage(o, f, t, withFiles) {
+function orderMessage(o, f, t) {
   const L = [], line = '━━━━━━━━━━━━━━';
   const kg = t.okLines.some(l => l.p.kg);
   L.push(`🛒 *ЗАКАЗ №${o.id}*`);
@@ -1048,7 +1024,7 @@ function orderMessage(o, f, t, withFiles) {
     if (f.noCall) L.push('🔕 Не звонить в домофон');
   }
   L.push('');
-  const slot = f.slot === 'asap' ? 'как можно скорее' : new Date(f.slot).toLocaleString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const slot = f.slot === 'asap' ? 'как можно скорее' : new Date(f.slot).toLocaleString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: GROZNY_TIMEZONE });
   L.push(`🕐 *Время:* ${slot}`);
   L.push(`💳 *Оплата:* ${payLabel(f.pay)}${f.pay === 'cash' && f.change ? `, сдача с ${f.change} ₽` : ''}`);
   L.push(`🔁 *Нет товара:* ${({ call: 'позвонить и согласовать', similar: 'заменить на похожий', remove: 'убрать из заказа' })[f.replace] || 'позвонить'}`);
@@ -1064,153 +1040,73 @@ function orderMessage(o, f, t, withFiles) {
   if (!f.pickup) L.push(`Доставка: ${t.delivery ? rub(t.delivery) : 'бесплатно'}`);
   if (f.tip && !f.pickup) L.push(`Чаевые: ${rub(f.tip)}`);
   L.push(`💰 *ИТОГО: ${kg ? '≈' : ''}${rub(o.total)}*`);
-  if (!withFiles) { L.push(''); L.push('🖼 *Фото всех товаров:*'); L.push(orderViewLink(o)); }   // только в запасном WhatsApp — там фото не прикрепить
+  L.push('', '🖼 *Фото всех товаров:*', orderViewLink(o));
   return L.join('\n');
 }
 
-/* Картинка заказа: фото товаров со списком — одной картинкой, чтобы продавцу было видно, что брать */
-async function orderCardImage(order, lines) {
-  const W = 1080, PAD = 48, ROW = 156, HEAD = 190, FOOT = 150;
-  const H = HEAD + lines.length * ROW + FOOT;
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
-  const font = (w, sz) => `${w} ${sz}px Onest, system-ui, -apple-system, sans-serif`;
-  const load = src => new Promise(res => { if (!src) return res(null); const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; setTimeout(() => res(null), 3000); });
-  const imgs = await Promise.all(lines.map(l => load(/kindar-product\.ru/.test(l.p.img || '') ? null : l.p.img).then(im => im || load(`assets/icons/${l.p.icon}.webp`))));
-  g.fillStyle = '#EEEDE8'; g.fillRect(0, 0, W, H);
-  g.fillStyle = '#0033B0'; g.fillRect(0, 0, W, HEAD - 30);
-  g.fillStyle = '#fff'; g.font = font(800, 56); g.fillText(order.id ? `Заказ №${order.id}` : 'Заказ', PAD, 92);
-  g.font = font(500, 30); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText([`${lines.length} поз.`, order.address].filter(Boolean).join(' · ').slice(0, 60), PAD, 138);
-  const clip = (t, max) => { if (g.measureText(t).width <= max) return t; while (t.length && g.measureText(t + '…').width > max) t = t.slice(0, -1); return t + '…'; };
-  lines.forEach((l, k) => {
-    const y = HEAD + k * ROW;
-    g.fillStyle = '#fff'; g.beginPath(); g.roundRect(PAD - 16, y, W - 2 * PAD + 32, ROW - 16, 26); g.fill();
-    const im = imgs[k], box = 116, bx = PAD, by = y + 12;
-    if (im) { const r = Math.min(box / im.width, box / im.height); g.drawImage(im, bx + (box - im.width * r) / 2, by + (box - im.height * r) / 2, im.width * r, im.height * r); }
-    g.fillStyle = '#0E1433'; g.font = font(800, 30); g.fillText(`${k + 1}.`, bx + box + 22, y + 52);
-    g.font = font(600, 30); const nx = bx + box + 70; g.fillText(clip(l.p.name, W - nx - PAD - 10), nx, y + 52);
-    g.font = font(500, 28); g.fillStyle = '#4B5170'; g.fillText(`${fmtQty(l.p, l.qty)} × ${rubP(l.p.price)}${l.p.kg ? '/кг' : ''}`, nx, y + 100);
-    g.font = font(800, 32); g.fillStyle = '#0033B0'; const sum = `${l.p.kg ? '≈' : ''}${rub(l.sum)}`; g.fillText(sum, W - PAD - g.measureText(sum).width, y + 100);
-  });
-  const fy = HEAD + lines.length * ROW + 30;
-  g.fillStyle = '#0E1433'; g.font = font(800, 44); g.fillText(`Итого: ${lines.some(l => l.p.kg) ? '≈' : ''}${rub(order.total)}`, PAD, fy + 50);
-  g.font = font(500, 26); g.fillStyle = '#8E92A6'; g.fillText('MayrMarket · с доставкой', PAD, fy + 92);
-  try {
-    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
-    return blob ? new File([blob], `zakaz${order.id ? "-" + order.id : ""}.jpg`, { type: 'image/jpeg' }) : null;
-  } catch { return null; }   // если какая-то картинка без разрешения — без карточки, только фото дома
-}
-// Ссылка на страницу заказа с фото товаров (в ссылке только товары и количество, без личных данных)
 const orderViewLink = o => `${location.origin}${location.pathname}#/z/${o.id}/${o.items.map(i => `${i.id.slice(1)}:${i.qty}`).join(',')}`;
 const waLink = text => `https://wa.me/${ORDER_WHATSAPP}?text=${encodeURIComponent(text)}`;
 
-/* Отправка заказа.
-   Если чат с продавцом у клиента уже есть (не первый заказ) — всё одним действием:
-   «Поделиться» → WhatsApp → чат продавца, и уходят текст + картинка заказа + фото дома.
-   Первый заказ: чата ещё нет, поэтому открываем чат по ссылке (только текст), а фото — вторым шагом. */
-/* ===== Отправка заказа в Telegram через бота (прямо из браузера, без сервера) ===== */
-const tgHtml = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  .replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(^|\s)_([^_\n]+)_(?=\s|$)/g, '$1<i>$2</i>');
-const tgToken = (() => { let v = null; return () => {
-  if (v) return v;
-  const k = TG_BOT_KEY, parts = []; k.o.forEach((src, i) => { parts[src] = k.p[i]; });
-  const raw = atob(parts.join('').split('').reverse().join('')), key = 'mayr-market-grozny';
-  return (v = [...raw].map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))).join(''));
-}; })();
-// Без ответа за ms — обрываем (в России Telegram без VPN «висит», ждать бесполезно)
-async function tgCall(method, body, ms = 8000) {
-  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms);
-  let r;
-  try { r = await fetch(`https://api.telegram.org/bot${tgToken()}/${method}`, { method: 'POST', body, signal: ac.signal }); }
-  catch (e) { const er = new Error('Telegram недоступен'); er.net = true; throw er; }
-  finally { clearTimeout(tm); }
-  const j = await r.json().catch(() => ({}));
-  if (!j.ok) throw new Error(j.description || `Telegram ${r.status}`);
-  return j;
-}
-// Отправка с повтором: до 3 попыток на каждый шаг; заказ считается доставленным,
-// если дошёл хотя бы до одного получателя (если кто-то заблокировал бота — остальные всё равно получат)
-const retry = async (fn, n = 3) => { for (let a = 1; ; a++) { try { return await fn(); } catch (e) { if (a >= n || e.net || /chat not found|blocked|Forbidden|Unauthorized/i.test(e.message)) throw e; await new Promise(r => setTimeout(r, 800 * a)); } } };
-async function sendOrderTelegram(text, files) {
-  await tgCall('getMe', undefined, 5000);   // быстрая проверка связи: нет ответа за 5 с — сразу запасной путь
-  const one = async chat => {
-    if (files.length === 1) {
-      await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('photo', files[0], files[0].name || 'photo.jpg'); return tgCall('sendPhoto', fd, 15000); }).catch(e => { if (e.net) throw e; });
-    } else if (files.length > 1) {
-      await retry(() => { const fd = new FormData(); fd.append('chat_id', chat);
-        fd.append('media', JSON.stringify(files.map((_, i) => ({ type: 'photo', media: `attach://f${i}` }))));
-        files.forEach((f, i) => fd.append(`f${i}`, f, f.name || `photo${i}.jpg`)); return tgCall('sendMediaGroup', fd, 15000); }).catch(e => { if (e.net) throw e; });   // фото не дошли — текст всё равно отправим
-    }
-    await retry(() => { const fd = new FormData(); fd.append('chat_id', chat); fd.append('text', tgHtml(text)); fd.append('parse_mode', 'HTML');
-      fd.append('link_preview_options', JSON.stringify({ is_disabled: true })); return tgCall('sendMessage', fd); });
-  };
-  // всем получателям одновременно; заказ доставлен, если дошёл хотя бы до одного
-  const res = await Promise.allSettled(TG_CHATS.map(one));
-  if (!res.some(r => r.status === 'fulfilled')) throw (res.find(r => r.reason) || {}).reason || new Error('Telegram: никому не доставлено');
-}
-
 function placeOrder(f) {
   const t = totals();
-  const d = new Date(), id = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getTime()).slice(-3)}`;
+  if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
+  const d = new Date();
+  const random = crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
+  const id = `${pad2(d.getDate())}${pad2(d.getMonth() + 1)}-${random}`;
   const order = {
     id, createdAt: Date.now(), point: state.point, mode: f.pickup ? 'pickup' : 'delivery', via: 'wa',
     items: t.okLines.map(l => ({ id: l.p.id, name: l.p.name, qty: l.qty, price: l.p.price, offers: l.p.offers })),
     total: t.total + (f.pickup ? 0 : f.tip), pay: f.pay, slot: f.slot,
     address: f.pickup ? 'Самовывоз' : `${f.street.trim()}${f.kind === 'flat' && f.apt ? ', кв. ' + f.apt : ''}`
   };
-  const photos = orderPhotos.map(ph => ph.file);
-  const files = [checkoutCard, ...photos].filter(Boolean);
-  const finish = oneStep => {
-    sentPhotos = oneStep ? [] : photos; orderPhotos = [];
-    sentCard = oneStep ? null : checkoutCard;
-    order.oneStep = oneStep;
+  order.text = orderMessage(order, f, t);
+  const modal = $('#modal');
+  modal.className = 'modal show';
+  modal.innerHTML = `
+    <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
+    <div class="success">
+      <span class="success__icon success__icon--wa">${svgI('whatsapp', 56)}</span>
+      <h2>Заказ №${id} готов к отправке</h2>
+      <p>Откройте WhatsApp и нажмите там «Отправить». Фото входа можно прикрепить в чате. Затем вернитесь сюда, чтобы сохранить заказ и освободить корзину.</p>
+      <a class="btn btn--primary btn--block" href="${waLink(order.text)}" target="_blank" rel="noopener noreferrer" data-open-whatsapp>Открыть WhatsApp</a>
+      <button class="btn btn--ghost btn--block" style="margin-top:8px" type="button" data-copy-order>Скопировать заказ</button>
+      <button class="btn btn--ghost btn--block" style="margin-top:8px" type="button" data-confirm-order disabled>Я отправил заказ</button>
+    </div>`;
+  const confirm = $('[data-confirm-order]', modal);
+  $('[data-open-whatsapp]', modal).onclick = () => { confirm.disabled = false; };
+  $('[data-copy-order]', modal).onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(order.text);
+      confirm.disabled = false;
+      toast('Заказ скопирован');
+    } catch {
+      toast('Не удалось скопировать. Откройте WhatsApp по ссылке.');
+    }
+  };
+  confirm.onclick = () => {
+    confirm.disabled = true;
     state.orders.unshift(order);
     const rv = LS.get('reserved', {}), now = Date.now();
-    t.okLines.forEach(l => { const o = rv[l.p.id]; rv[l.p.id] = { q: (o && now - o.t < RESERVE_TTL ? o.q : 0) + l.qty, t: now }; });
-    LS.set('reserved', rv); reservedCache = null;
-    t.okLines.forEach(l => delete state.cart[l.p.id]);
-    LS.set('waKnown', true);
+    for (const item of order.items) {
+      const previous = rv[item.id];
+      rv[item.id] = { q: (previous && now - previous.t < RESERVE_TTL ? previous.q : 0) + item.qty, t: now };
+      const remaining = Math.round(((state.cart[item.id] || 0) - item.qty) * 10) / 10;
+      if (remaining > 0) state.cart[item.id] = remaining;
+      else delete state.cart[item.id];
+    }
+    LS.set('reserved', rv);
+    reservedCache = null;
     save();
+    closeAll();
     location.hash = '#/orders';
-    setTimeout(() => openTracking(order.id), 60);
   };
-  if (typeof TG_BOT_KEY !== 'undefined' && TG_CHATS.length) {
-    const btn = $('#payBtn'); btn.disabled = true; btn.innerHTML = '<span>Отправляем заказ…</span>';
-    (async () => {
-      const card = checkoutCard || await orderCardImage(order, t.okLines);
-      const fl = [card, ...photos].filter(Boolean).slice(0, 10);
-      sentPhotos = photos; order.text = orderMessage(order, f, t, true);
-      await sendOrderTelegram(order.text, fl);
-      order.via = 'tg'; finish(true);
-    })().catch(err => {
-      console.warn('Telegram:', err);
-      btn.disabled = false;
-      // запасной путь: WhatsApp (только текст)
-      sentPhotos = photos; order.text = orderMessage(order, f, t, false);
-      toast('Не удалось отправить напрямую — открываем WhatsApp');
-      finish(false);
-      setTimeout(() => { location.href = waLink(order.text); }, 700);
-    });
-    return;
-  }
-  if (SHARE_FILES && LS.get('waKnown', false) && files.length && navigator.canShare && navigator.canShare({ files })) {
-    sentPhotos = photos; order.text = orderMessage(order, f, t, true);
-    navigator.share({ files, text: order.text })
-      .then(() => finish(true))
-      .catch(e => { if (e && e.name !== 'AbortError') toast('Не получилось отправить, попробуйте ещё раз'); });
-    return;
-  }
-  sentPhotos = photos; order.text = orderMessage(order, f, t, false);
-  const url = waLink(order.text);
-  const win = window.open(url, '_blank');   // в обработчике нажатия — браузер разрешает
-  finish(false);
-  if (!win) location.href = url;
+  showOverlay();
 }
 
 /* ================= Страница заказа с фото (по ссылке из WhatsApp) ================= */
 function renderOrderView() {
   const [, id = '', list = ''] = location.hash.replace(/^#\/?/, '').split('/');
-  const lines = list.split(',').map(x => x.split(':')).map(([pid, q]) => ({ p: byId['p' + pid], qty: +q })).filter(l => l.p && l.qty > 0);
+  const lines = list.split(',').map(x => x.split(':')).map(([pid, q]) => ({ p: byId['p' + pid], qty: +q })).filter(l => l.p && Number.isFinite(l.qty) && l.qty > 0);
   const sum = lines.reduce((a, l) => a + Math.round(l.p.price * l.qty), 0), kg = lines.some(l => l.p.kg);
   $('#page').innerHTML = `
     <div class="zv">
@@ -1262,14 +1158,12 @@ function openTracking(id) {
       <div class="success">
         <span class="success__icon success__icon--wa">${svgI('whatsapp', 56)}</span>
         <h2>Заказ №${o.id}</h2>
-        <p>В WhatsApp открылся ваш заказ — нажмите там «Отправить». Продавец подтвердит наличие и пришлёт ${o.pay === 'sbp' ? 'ссылку для оплаты по СБП' : 'время доставки'}.</p>
+        <p>Заказ сохранён на этом устройстве. В WhatsApp продавец подтвердит наличие и пришлёт ${o.pay === 'sbp' ? 'ссылку для оплаты по СБП' : 'время доставки'}.</p>
         <div class="totals" style="margin-top:14px;text-align:left">
           <div class="totals__row"><span>${o.mode === 'pickup' ? 'Получение' : 'Адрес'}</span><b>${esc(o.address)}</b></div>
           <div class="totals__row"><span>Оплата</span><b>${payLabel(o.pay)}</b></div>
           <div class="totals__row totals__row--total"><span>Сумма</span><b>${rub(o.total)}</b></div>
         </div>
-        ${SHARE_FILES && o.id === state.orders[0]?.id && !o.oneStep ? `<button class="btn btn--primary btn--block wa-open" data-share-photos>${svgI('whatsapp', 20)}Шаг 2: отправить фото товаров${sentPhotos.length ? ` и дома (${sentPhotos.length})` : ''}</button>
-        <div class="checkout__hint" style="text-align:center">Выберите WhatsApp, затем чат продавца</div>` : ''}
         <a class="btn btn--ghost btn--block wa-again" style="margin-top:10px" href="${waLink(o.text || `Заказ №${o.id}`)}" target="_blank" rel="noopener">${svgI('whatsapp', 20)}Открыть WhatsApp ещё раз</a>
         <div class="row row--2" style="margin-top:8px">
           <a class="btn btn--ghost" href="#/orders">Мои заказы</a>
@@ -1425,13 +1319,6 @@ document.addEventListener('click', e => {
   if ((x = el('[data-dd]'))) { state.dd = state.dd === x.dataset.dd ? null : x.dataset.dd; return renderControls(); }
 
   if ((x = el('[data-track]'))) return openTracking(x.dataset.track);
-  if (el('[data-share-photos]')) {
-    const files = [sentCard || checkoutCard, ...sentPhotos].filter(Boolean);
-    if (!files.length) { toast('Картинка заказа ещё готовится, нажмите через секунду'); return; }
-    if (navigator.canShare && navigator.canShare({ files })) navigator.share({ files }).catch(() => {});
-    else toast('Ваш браузер не умеет отправлять фото — прикрепите их в WhatsApp вручную');
-    return;
-  }
   if ((x = el('[data-repeat]'))) return repeatOrder(x.dataset.repeat);
   if (el('[data-close]')) return closeAll();
 
