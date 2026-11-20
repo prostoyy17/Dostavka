@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795164559';
+const BUILD = '1795185637';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -35,6 +35,9 @@ const state = {
 };
 
 const byId = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
+const catalogIds = new Set(window.CATALOG.items.map(row => 'p' + row[0]));
+state.favs = state.favs.filter(id => catalogIds.has(id));
+state.cart = Object.fromEntries(Object.entries(state.cart).filter(([id]) => catalogIds.has(id)));
 const catById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1137,7 +1140,7 @@ async function orderCardImage(order, lines) {
   const g = c.getContext('2d');
   const font = (w, sz) => `${w} ${sz}px Onest, system-ui, -apple-system, sans-serif`;
   const load = src => new Promise(res => { if (!src) return res(null); const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; setTimeout(() => res(null), 3000); });
-  const imgs = await Promise.all(lines.map(l => load(/kindar-product\.ru/.test(l.p.img || '') ? null : l.p.img).then(im => im || load(`assets/icons/${l.p.icon}.webp`))));
+  const imgs = await Promise.all(lines.map(l => load(l.p.img).then(im => im || load(`assets/icons/${l.p.icon}.webp`))));
   g.fillStyle = '#EEEDE8'; g.fillRect(0, 0, W, H);
   g.fillStyle = '#0033B0'; g.fillRect(0, 0, W, HEAD - 30);
   g.fillStyle = '#fff'; g.font = font(800, 56); g.fillText(order.id ? `Заказ №${order.id}` : 'Заказ', PAD, 92);

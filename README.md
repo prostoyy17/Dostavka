@@ -15,7 +15,7 @@ js/
   icons.js            иконки интерфейса (SVG)
   app.js              логика: страницы, корзина, избранное, поиск, фильтры, оформление заказа
 data/
-  catalog.js          каталог товаров (Musafir Market, Parhato, Kindar Product)
+  catalog.js          каталог товаров Musafir Market
   photos.js           наши собственные фото для товаров без фото в магазине
 assets/
   brand/              логотип, иконки (вкладка, экран «Домой»), картинка превью ссылки og-logo.png
