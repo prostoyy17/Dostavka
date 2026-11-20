@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795162183';
+const BUILD = '1795162622';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -842,7 +842,7 @@ function timeSlots() {
 // Оформление — обычная отдельная страница (#/checkout), а не всплывающее окно:
 // прокручивается как страница, Safari сам правильно обрабатывает свои панели сверху и снизу.
 let sendingOrder = false;
-function openCheckout() {
+function openCheckout(selectedPhotos = []) {
   if (state.route !== 'checkout') { location.hash = '#/checkout'; return; }
   const t = totals();
   if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
@@ -852,6 +852,7 @@ function openCheckout() {
   if (state.user) { if (!f.name) f.name = state.user.name || ''; if (!f.phone) f.phone = state.user.phone || ''; }
   const flat = f.kind === 'flat';   // тип адреса: частный дом или квартира/офис
   const pt = t.pt, pickup = t.isPickup;
+  const addressPhotos = pickup ? [] : savedPhotos().slice(0, 3);
   const m = $('#page');
   m.innerHTML = `${backBar()}
     <form class="checkout checkout--page" id="checkoutForm" novalidate>
@@ -872,7 +873,12 @@ function openCheckout() {
             <div class="field"><input name="code" placeholder=" " value="${esc(f.code || '')}"><label>Домофон</label></div>
           </div>` : ''}
           <div class="field"><select name="zone">${pt.zones.map(z => `<option ${f.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select><label>Район</label></div>
-          <div class="field"><textarea name="comment" placeholder=" ">${esc(f.comment || '')}</textarea><label>Комментарий курьеру</label></div>`}
+          <div class="field"><textarea name="comment" placeholder=" ">${esc(f.comment || '')}</textarea><label>Комментарий курьеру</label></div>
+          <div class="photos">
+            <div class="photos__title">Фото дома или входа <span>${addressPhotos.length ? 'из адреса доставки' : 'до 3 фото, по желанию'}</span></div>
+            <div class="photos__list" id="checkoutPhotos"></div>
+            ${addressPhotos.length ? '' : '<input id="orderPhotos" type="file" accept="image/*" multiple hidden>'}
+          </div>`}
         </div>
         <div class="fieldset">
           <div class="fieldset__title"><span class="fieldset__num">2</span>Контакты</div>
@@ -911,14 +917,42 @@ function openCheckout() {
         </div>
         ${t.okLines.some(l => l.p.kg) ? `<div class="weight-note">${WEIGHT_NOTE}</div>` : ''}
         <div class="totals" id="checkoutTotals"></div>
-        <div class="fieldset">
-          <label>До трёх фото входа<input id="orderPhotos" type="file" accept="image/*" multiple></label>
-          <p>Если файлы не выбраны, используем фотографии из сохранённого адреса.</p><p id="sendStatus" role="status"></p></div>
+        <div id="sendStatus" role="status"></div>
         <button class="btn btn--primary btn--block btn--between" type="submit" id="payBtn"></button>
       </div></div>
     </form>`;
 
   const form = $('#checkoutForm');
+  const photoList = $('#checkoutPhotos', form);
+  if (photoList && addressPhotos.length) {
+    photoList.innerHTML = addressPhotos.map((url, i) =>
+      `<div class="photos__item"><img src="${esc(url)}" alt="Фото входа ${i + 1}"></div>`
+    ).join('');
+  } else if (photoList) {
+    const input = $('#orderPhotos', form);
+    const draw = () => {
+      const urls = selectedPhotos.map(file => URL.createObjectURL(file));
+      photoList.innerHTML = photoTiles(urls);
+      photoList.querySelectorAll('img').forEach(img => {
+        const release = () => URL.revokeObjectURL(img.src);
+        img.onload = img.onerror = release;
+        if (img.complete) release();
+      });
+    };
+    photoList.onclick = event => {
+      if (event.target.closest('[data-ph-add]')) input.click();
+      const remove = event.target.closest('[data-ph-del]');
+      if (remove) { selectedPhotos.splice(Number(remove.dataset.phDel), 1); draw(); }
+    };
+    input.onchange = () => {
+      const room = 3 - selectedPhotos.length;
+      if (input.files.length > room) toast('Можно добавить до 3 фото');
+      selectedPhotos.push(...Array.from(input.files).slice(0, room));
+      input.value = '';
+      draw();
+    };
+    draw();
+  }
   const drawTotals = () => {
     const tt = totals();
     const sum = tt.total + (pickup ? 0 : f.tip);
@@ -944,14 +978,14 @@ function openCheckout() {
       state.address.kind = kd.dataset.kind;
       state.address.comment = d.comment || '';
       const y = window.scrollY;
-      slideKind(kd, () => { openCheckout(); window.scrollTo(0, y); });
+      slideKind(kd, () => { openCheckout(selectedPhotos); window.scrollTo(0, y); });
       return;
     }
     const sw = e.target.closest('[data-mode-sw]');
     if (sw && sw.dataset.modeSw !== state.mode) {
       const d = Object.fromEntries(new FormData(form));
       state.address = { ...state.address, ...['street', 'house', 'apt', 'entrance', 'floor', 'code', 'zone', 'name', 'phone', 'landmark'].reduce((o, k) => (d[k] !== undefined ? (o[k] = d[k], o) : o), {}) };
-      state.mode = sw.dataset.modeSw; openCheckout(); return;
+      state.mode = sw.dataset.modeSw; openCheckout(selectedPhotos); return;
     }
     if (tp) { f.tip = +tp.dataset.tip; $$('[data-tip]', form).forEach(b => b.classList.toggle('active', b === tp)); drawTotals(); }
   };
@@ -980,14 +1014,14 @@ function openCheckout() {
     if ((data.phone || '').replace(/\D/g, '').length !== 11) err('phone', 'Номер полностью');
     if (first) { first.focus(); toast('Проверьте поля'); return; }
     if (!timeSlots().some(slot => slot.id === f.slot)) {
-      openCheckout();
+      openCheckout(selectedPhotos);
       toast('Выбранное время уже недоступно. Выберите другое.');
       return;
     }
 
     state.address = { ...state.address, kind: flat ? 'flat' : 'house', name: data.name, phone: data.phone, ...(pickup ? {} : { comment: data.comment || '', street: data.street.trim(), house: '', apt: data.apt, entrance: data.entrance, floor: data.floor, code: data.code, zone: data.zone }) };
     LS.set('address', state.address);
-    placeOrder({ ...f, ...data, pickup, kind: flat ? 'flat' : 'house' });
+    placeOrder({ ...f, ...data, pickup, kind: flat ? 'flat' : 'house' }, addressPhotos, pickup ? [] : selectedPhotos.slice());
   };
 }
 
@@ -1082,7 +1116,7 @@ async function orderCardImage(order, lines) {
     return blob ? new File([blob], `zakaz${order.id ? "-" + order.id : ""}.jpg`, { type: 'image/jpeg' }) : null;
   } catch { return null; }   // если какая-то картинка без разрешения — без карточки, только фото дома
 }
-async function placeOrder(f) {
+async function placeOrder(f, addressPhotos, photos) {
   const t = totals();
   if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
   const d = new Date();
@@ -1113,8 +1147,6 @@ async function placeOrder(f) {
   };
   if (sendingOrder) return;
   const status = $('#sendStatus'), btn = $('#payBtn');
-  const photos = Array.from($('#orderPhotos').files);
-  if (photos.length > 3) { status.textContent = 'Выберите до трёх файлов.'; return; }
   sendingOrder = true;
   btn.disabled = true;
   status.textContent = 'Готовим карточку и фотографии…';
@@ -1122,7 +1154,7 @@ async function placeOrder(f) {
     const start = performance.now();
     const card = await orderCardImage(order, t.okLines);
     if (!card) throw new Error('Не удалось собрать карточку товаров.');
-    const pictures = photos.length ? await Promise.all(photos.map(shrinkPhoto)) : savedPhotos().slice(0, 3);
+    const pictures = photos.length ? await Promise.all(photos.map(shrinkPhoto)) : addressPhotos;
     const files = [card];
     for (const [i, picture] of pictures.entries()) {
       if (!picture || !picture.startsWith('data:image/')) throw new Error('Не удалось прочитать фото входа.');
