@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795203200';
+const BUILD = '1795203434';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -25,7 +25,7 @@ const state = {
   theme: LS.get('theme', null),
   route: 'catalog',
   cat: 'all',
-  store: null,
+  store: LS.get('catalogStore', null),
   query: '',
   sub: null,
   filters: new Set(),
@@ -35,6 +35,7 @@ const state = {
   favSort: 'added'
 };
 
+if (!Number.isInteger(state.store) || !STORES[state.store]) state.store = null;
 const byId = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
 const catalogIds = new Set(window.CATALOG.items.map(row => 'p' + row[0]));
 state.favs = state.favs.filter(id => catalogIds.has(id));
@@ -255,12 +256,6 @@ function renderCatalogPage() {
   const home = state.cat === 'all' && !state.query && state.store === null;
   page.innerHTML = `
     <div class="circles" id="catStrip"></div>
-    <div class="store-picker" role="group" aria-label="Магазин">
-      ${['Все магазины', ...STORES.map(s => s.name)].map((name, i) => {
-        const selected = state.store === (i ? i - 1 : null);
-        return `<button class="pill ${selected ? 'on' : ''}" aria-pressed="${selected}" data-store="${i - 1}">${esc(name)}</button>`;
-      }).join('')}
-    </div>
     ${home ? '' : `<div class="toolbar"><h1 class="toolbar__title">${title}</h1></div>
     <div class="controls" id="controls"></div>`}
     <div id="catalog"></div>`;
@@ -698,7 +693,7 @@ function renderOrders() {
 /* ================= Point ================= */
 function renderPoint() {
   const pt = point();
-  $('#pointCity').textContent = typeof WAREHOUSES_ENABLED !== 'undefined' && WAREHOUSES_ENABLED && pt ? `Склад ${pt.city}` : 'Доставка по Грозному';
+  $('#pointCity').textContent = STORES[state.store]?.name || 'Все магазины';
   const open = pt ? isOpen(pt) : false;
   $('#pointDot').classList.toggle('off', !open);
   $('#pointMeta').textContent = pt
@@ -710,19 +705,29 @@ function renderPoint() {
 function openPoints() {
   let sel = state.point || POINTS[0].id;
   let mode = state.mode;
+  let selectedStore = state.store;
   const draw = () => {
     $('#modal').className = 'modal show';
     $('#modal').innerHTML = `
       <button class="close-x" data-close aria-label="Закрыть">${svgI('x', 18)}</button>
       <div class="pts">
         <div class="pts__list">
-          <h2 class="pts__title">Доставка по Грозному</h2>
+          <h2 class="pts__title">Выбор магазина</h2>
+          <div class="store-options" role="group" aria-label="Магазины">
+            ${['Все магазины', ...STORES.map(store => store.name)].map((name, i) => {
+              const selected = selectedStore === (i === 0 ? null : i - 1);
+              const logo = ['icon-192.png', 'musafir.jpg', 'vkusdom.jpg'][i] || 'icon-192.png';
+              return `<button type="button" class="store-option" data-store="${i - 1}" aria-pressed="${selected}">
+                <img src="assets/brand/${logo}" alt=""><span>${esc(name)}</span><i aria-hidden="true"></i>
+              </button>`;
+            }).join('')}
+          </div>
           ${POINTS.map(p => {
             const open = isOpen(p);
-            const n = PRODUCTS.filter(x => x.stock[p.id] > 0).length;
+            const n = PRODUCTS.filter(x => x.stock[p.id] > 0 && (selectedStore === null || x.offers.some(o => o[0] === selectedStore))).length;
             return `<button class="pt ${p.id === sel ? 'active' : ''}" data-pick="${p.id}">
               <span class="pt__city">${p.city}</span>
-              <span class="pt__addr">Товары из магазинов: ${p.store}</span>
+              <span class="pt__addr">Доставка по Грозному</span>
               <span class="pt__eta">${p.eta}<small class="pt__badge ${open ? '' : 'closed'}">${open ? 'Открыто' : 'Закрыто'}</small></span>
               <span class="pt__info">${hours(p)} · ${n.toLocaleString('ru-RU')} товаров · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно${p.minOrder ? ` · заказ от ${rub(p.minOrder)}` : ''}</span>
             </button>`;
@@ -735,14 +740,25 @@ function openPoints() {
   showOverlay();
   $('#modal').onclick = e => {
     const pick = e.target.closest('[data-pick]'), m = e.target.closest('[data-mode]');
-    if (pick) { sel = pick.dataset.pick; draw(); }
+    const option = e.target.closest('[data-store]');
+    if (option) {
+      const index = Number(option.dataset.store);
+      selectedStore = index < 0 ? null : index;
+      draw();
+      $('#modal [aria-pressed="true"]').focus({preventScroll: true});
+    }
+    else if (pick) { sel = pick.dataset.pick; draw(); }
     else if (m) { mode = m.dataset.mode; draw(); }
     else if (e.target.closest('[data-confirm-point]')) {
       const changed = state.point && state.point !== sel;
+      if (state.store !== selectedStore) {
+        state.store = selectedStore; state.limit = 60; state.sub = null; state.dd = null;
+      }
+      LS.set('catalogStore', state.store);
       state.point = sel; state.mode = mode; save();
       closeAll(); renderAll();
       const bad = cartLines().filter(l => !l.ok).length;
-      toast(changed && bad ? `${bad} ${plural(bad, 'товар недоступен', 'товара недоступны', 'товаров недоступны')}` : `Доставка: ${point().city}`);
+      if (changed && bad) toast(`${bad} ${plural(bad, 'товар недоступен', 'товара недоступны', 'товаров недоступны')}`);
     }
   };
 }
@@ -1426,13 +1442,6 @@ document.addEventListener('click', e => {
     return;
   }
   if ((x = el('[data-open]'))) return openProduct(x.dataset.open);
-  if ((x = el('[data-store]'))) {
-    const selected = Number(x.dataset.store);
-    state.store = selected < 0 ? null : selected;
-    state.limit = 60; state.dd = null; state.sub = null;
-    renderPage();
-    return;
-  }
   if ((x = el('[data-cat]'))) { closeAll(); return goCatalog(x.dataset.cat); }
   if ((x = el('[data-filter]'))) {
     const f = x.dataset.filter;
@@ -1470,7 +1479,7 @@ document.addEventListener('click', e => {
     }
     if (a === 'remove-bad') { cartLines().filter(l => !l.ok).forEach(l => l.avail ? state.cart[l.p.id] = l.avail : delete state.cart[l.p.id]); save(); renderAll(); }
     if (a === 'checkout') openCheckout();
-    if (a === 'reset') { state.store = null; state.filters.clear(); state.sub = null; state.query = ''; $('#searchInput').value = ''; goCatalog('all'); }
+    if (a === 'reset') { state.store = null; LS.set('catalogStore', null); renderPoint(); state.filters.clear(); state.sub = null; state.query = ''; $('#searchInput').value = ''; goCatalog('all'); }
     if (a === 'clear-favs') {
       const backup = [...state.favs];
       state.favs = []; save(); renderPage();
