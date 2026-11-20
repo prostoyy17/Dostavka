@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795203434';
+const BUILD = '1795203870';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -716,9 +716,9 @@ function openPoints() {
           <div class="store-options" role="group" aria-label="Магазины">
             ${['Все магазины', ...STORES.map(store => store.name)].map((name, i) => {
               const selected = selectedStore === (i === 0 ? null : i - 1);
-              const logo = ['icon-192.png', 'musafir.jpg', 'vkusdom.jpg'][i] || 'icon-192.png';
+              const logo = ['', '<img src="assets/brand/musafir-clear.png" alt="">', '<span class="vkusdom-mark" aria-hidden="true"></span>'][i] || '';
               return `<button type="button" class="store-option" data-store="${i - 1}" aria-pressed="${selected}">
-                <img src="assets/brand/${logo}" alt=""><span>${esc(name)}</span><i aria-hidden="true"></i>
+                ${logo}<span>${esc(name)}</span><i aria-hidden="true"></i>
               </button>`;
             }).join('')}
           </div>

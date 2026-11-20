@@ -544,8 +544,8 @@ button, input, select, textarea { font-family: var(--font); }
 .stepper--round span { min-width: 20px; text-align: center; font-weight: 800; }
 .card__price { margin: 12px 2px 0; height: auto; }
 .card .price { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
-.card__name { margin: 4px 2px 0; font-size: 15px; line-height: 20px; height: 40px; color: var(--text); }
-.card__unit { margin: 4px 2px 0; font-size: 13px; color: var(--text-3); min-height: 18px; }
+.card__name { margin: 4px 2px 0; font-size: 15px; line-height: 20px; color: var(--text); }
+.card__unit { margin: 2px 2px 0; font-size: 13px; color: var(--text-3); min-height: 18px; }
 .card.out .card__img img { filter: grayscale(1); opacity: .45; }
 
 /* ---- controls on category pages ---- */
@@ -579,7 +579,7 @@ button, input, select, textarea { font-family: var(--font); }
   .grid, .pm__related .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 14px; }
   .hrow { grid-auto-columns: calc((100% - 14px) / 2.25); gap: 14px; margin-right: -16px; padding-right: 16px; }
   .card .price { font-size: 19px; }
-  .card__name { font-size: 14px; line-height: 19px; height: 38px; }
+  .card__name { font-size: 14px; line-height: 19px; }
   .add-btn--round { width: 42px; height: 42px; }
   .stepper--round { height: 42px; }
   .stepper--round button { width: 34px; height: 34px; }
@@ -952,6 +952,9 @@ body.sticky-header .layout { padding-top: 16px; }
 
 .store-options { display: grid; gap: 8px; }
 .store-option { display: grid; grid-template-columns: 86px 1fr 18px; align-items: center; gap: 14px; padding: 9px 14px; text-align: left; border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); font-weight: 700; }
+.store-option[data-store="-1"] { grid-template-columns: 1fr 18px; min-height: 66px; }
+.store-option .vkusdom-mark { width: 46px; height: 46px; justify-self: center; background: #577460; mask: url("../assets/brand/vkusdom-mark.png") center / contain no-repeat; -webkit-mask: url("../assets/brand/vkusdom-mark.png") center / contain no-repeat; }
+:root[data-theme="dark"] .store-option .vkusdom-mark { background: #cbd5aa; }
 .store-option img { width: 86px; height: 46px; object-fit: contain; }
 .store-option i { width: 18px; height: 18px; border: 1.5px solid var(--line); border-radius: 50%; }
 .store-option[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
