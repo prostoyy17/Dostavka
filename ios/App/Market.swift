@@ -90,7 +90,7 @@ final class Storefront: UIViewController, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard webView.url?.host == storefront.host,
               let script = ProcessInfo.processInfo.environment["MAYR_WALKTHROUGH"] else { return }
-        webView.callAsyncJavaScript(script, arguments: [:], in: nil, contentWorld: .page) { result in
+        webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { result in
             let output: String
             switch result {
             case .success(let value): output = value as? String ?? "Missing recording result"
