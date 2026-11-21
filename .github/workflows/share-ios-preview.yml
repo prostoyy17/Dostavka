@@ -1,0 +1,26 @@
+name: Export recorded preview
+on:
+  push:
+    branches: [ios/simulator-preview]
+    paths: ['.github/workflows/share-ios-preview.yml']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: MayrMarket-iPhone
+          run-id: 44896312615
+          github-token: ${{ github.token }}
+          path: preview
+      - name: Save screen recording alongside the preview
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add preview
+          git commit -m "Share original iPhone Simulator recording and screenshots"
+          git push
