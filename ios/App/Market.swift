@@ -8,8 +8,16 @@ enum Page:String {case catalog,favorites,cart,account,address,settings,about,ord
 enum Panel:Equatable {case stores,product(Int),filters,sort,subs,receipt(String)}
 struct Market:View {
     let shop:Shop
-    @State var page=Page.catalog, panel:Panel?, draftStore:Int?
-    @State var category="all", query="", sub="", order="Популярные", photoOnly=false, kgOnly=false, limit=60
+    @State var page=Page.catalog
+    @State var panel:Panel?
+    @State var draftStore:Int?
+    @State var category="all"
+    @State var query=""
+    @State var sub=""
+    @State var order="Популярные"
+    @State var photoOnly=false
+    @State var kgOnly=false
+    @State var limit=60
     @State var favoriteSort="Недавно добавленные"
     @State var path:[Page]=[]
     @AppStorage("native-dark") var dark=false

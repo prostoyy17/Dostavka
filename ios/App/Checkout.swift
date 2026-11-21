@@ -48,7 +48,12 @@ struct AddressPage:View {
 }
 struct LoginPage:View {
     let shop:Shop,back:()->Void
-    @State var register=false,name="",phone="",password="",error="",visible=false
+    @State var register=false
+    @State var name=""
+    @State var phone=""
+    @State var password=""
+    @State var error=""
+    @State var visible=false
     var body:some View {ScrollView{VStack(alignment:.leading,spacing:16){
         Button(action:back){Glyph("back",26)}.accessibilityLabel("Назад")
         Picker("Аккаунт",selection:$register){Text("Войти").tag(false);Text("Зарегистрироваться").tag(true)}.pickerStyle(.segmented)
@@ -77,7 +82,16 @@ private func deliveryRange(_ now:Date=Date())->ClosedRange<Date> {
 }
 struct Checkout:View {
     let shop:Shop,back:()->Void,finished:(String)->Void
-    @State var a:Address,scheduled:Bool,time:Date,pay="СБП",change="",leave=false,noCall=false,replacement="Позвонить и согласовать",error="",sending=false
+    @State var a:Address
+    @State var scheduled:Bool
+    @State var time:Date
+    @State var pay="СБП"
+    @State var change=""
+    @State var leave=false
+    @State var noCall=false
+    @State var replacement="Позвонить и согласовать"
+    @State var error=""
+    @State var sending=false
     let hasPhotos:Bool
     init(shop:Shop,back:@escaping ()->Void,finished:@escaping (String)->Void){
         self.shop=shop;self.back=back;self.finished=finished;var draft=shop.memory.address

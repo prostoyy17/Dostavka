@@ -30,7 +30,8 @@ func openAt(_ d: Date) -> Bool { let h = cityCalendar.component(.hour, from:d); 
 func phoneDigits(_ s: String) -> String { String(s.filter(\.isNumber).suffix(10)) }
 @MainActor @Observable final class Shop {
     var catalog: Catalogue
-    var byID: [Int:Item], departments: [String:Department]
+    var byID: [Int:Item]
+    var departments: [String:Department]
     var memory: Memory { didSet { if let data = try? JSONEncoder().encode(memory) { try? data.write(to: file, options: [.atomic,.completeFileProtectionUntilFirstUserAuthentication]) } } }
     let file = URL.documentsDirectory.appending(path:"native-market.json")
     var recs: [Item]
