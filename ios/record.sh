@@ -1,24 +1,24 @@
 set -euo pipefail
 device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; ds=json.load(sys.stdin)["devices"]["com.apple.CoreSimulator.SimRuntime.iOS-27-2"]; print(next(d["udid"] for d in ds if d["name"]=="iPhone 18 Pro"))')
 xcrun simctl boot "$device"
+build=(-project MayrMarket.xcodeproj -scheme MayrMarket -destination "id=$device" -derivedDataPath build -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO)
+xcodebuild "${build[@]}" build-for-testing
 xcrun simctl bootstatus "$device" -b
 xcrun simctl status_bar "$device" override --time 09:41
-xcodebuild -project MayrMarket.xcodeproj -scheme MayrMarket -configuration Debug -destination "id=$device" -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
 mkdir -p output
-xcrun simctl install "$device" build/Build/Products/Debug-iphonesimulator/MayrMarket.app
-bundle=ru.mayrmarket.preview
-result="$(xcrun simctl get_app_container "$device" "$bundle" data)/Documents/walkthrough.json"
 xcrun simctl io "$device" recordVideo --codec=h264 output/MayrMarket.mp4 &
 recorder=$!
 trap 'kill -INT "$recorder" 2>/dev/null || true' EXIT
-python3 -c 'import time; print(round(time.time()*1000))' > output/start.txt
-sleep 2
-SIMCTL_CHILD_MAYR_WALKTHROUGH="$(cat Recording/walkthrough.js)" xcrun simctl launch "$device" "$bundle" -AppleLanguages '(ru)' -AppleLocale ru_RU
-for ((i=0;i<180;i++)); do [[ -f "$result" ]] && break; sleep 1; done
-xcrun simctl io "$device" screenshot output/final.png
-kill -INT "$recorder"
-wait "$recorder" || true
+xcodebuild "${build[@]}" -resultBundlePath Shopping.xcresult test-without-building
+kill -INT "$recorder"; wait "$recorder" || true
 trap - EXIT
-cat "$result"
-cp "$result" output/chapters.json
-python3 -c 'import json; assert json.load(open("output/chapters.json"))["ok"]'
+xcrun xcresulttool export attachments --path Shopping.xcresult --output-path attachments
+python3 - <<'PY'
+import json, pathlib, shutil, re
+root=pathlib.Path('attachments')
+for section in json.loads((root/'manifest.json').read_text()):
+    for a in section['attachments']:
+        m=re.search(r'0[1-9]-[a-z]+',a['suggestedHumanReadableName'])
+        if m: shutil.copyfile(root/a['exportedFileName'],'output/'+m.group()+'.png')
+assert len(list(pathlib.Path('output').glob('*.png')))==9
+PY

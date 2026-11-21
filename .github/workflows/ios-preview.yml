@@ -28,10 +28,10 @@ jobs:
           if-no-files-found: error
       - name: Publish the verified simulator media on the preview branch
         run: |
-          mkdir -p preview/storefront
-          cp ios/output/* preview/storefront/
+          mkdir -p preview/native-store
+          cp ios/output/* preview/native-store/
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
-          git add preview/storefront
+          git add preview/native-store
           git commit -m "Save iOS simulator walkthrough"
           git push
