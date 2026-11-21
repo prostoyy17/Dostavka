@@ -37,7 +37,7 @@ struct Market:View {
                 case .address: AddressPage(shop:shop,back:back)
                 case .login: LoginPage(shop:shop,back:back)
                 default:
-                    ScrollView {
+                    GeometryReader { viewport in ScrollView {
                         VStack(alignment:.leading,spacing:16) {
                             if [.orders,.about,.settings].contains(page){backButton}
                             switch page {
@@ -47,8 +47,8 @@ struct Market:View {
                             case .account,.settings,.about,.orders: accountView
                             default: EmptyView()
                             }
-                        }.padding(.horizontal,16).padding(.top,page == .catalog ? 8 : 24).padding(.bottom,102).frame(maxWidth:.infinity,alignment:.leading)
-                    }.id(page).scrollDismissesKeyboard(.interactively)
+                        }.frame(minHeight:page == .account ? max(0,viewport.size.height-125) : nil).padding(.horizontal,16).padding(.top,page == .catalog ? 6 : 24).padding(.bottom,102).frame(maxWidth:.infinity,alignment:.leading)
+                    }.id(page).scrollDismissesKeyboard(.interactively) }
                 }
             }.frame(maxWidth:.infinity,maxHeight:.infinity).accessibilityHidden(panel != nil)
             if ![.checkout,.login].contains(page) && !searching { tabbar.accessibilityHidden(panel != nil) }
@@ -142,19 +142,19 @@ struct Market:View {
             Text(name).font(type(12,600)).lineLimit(2).multilineTextAlignment(.center).foregroundStyle(id==category ? Color.accentBlue : Color.ink)
         }.frame(width:76)}.accessibilityIdentifier("cat-"+id)
     }
-    func pill(_ name:String,_ icon:String,_ target:Panel)->some View {Button{panel=target}label:{HStack(spacing:5){Glyph(icon,14);Text(name).font(type(12,600)).lineLimit(1);Glyph("down",10)}.frame(maxWidth:.infinity,minHeight:40).tile(.surface,24)}}
+    func pill(_ name:String,_ icon:String,_ target:Panel)->some View {Button{panel=target}label:{HStack(spacing:5){Glyph(icon,14);Text(name).font(type(12,600)).lineLimit(1);Glyph("down",10)}.frame(maxWidth:.infinity,minHeight:40).tile(.surface,24)}.accessibilityLabel(name)}
     func grid(_ items:[Item])->some View {LazyVGrid(columns:[GridItem(.flexible(),spacing:14),GridItem(.flexible())],alignment:.leading,spacing:22){ForEach(items){card($0)}}}
     func card(_ p:Item)->some View {
         VStack(alignment:.leading,spacing:4) {
-            Color.white.aspectRatio(1,contentMode:.fit).overlay{ProductPhoto(item:p,icon:shop.departments[p.cat]?.icon ?? "basket").padding(16)}
+            Color.white.aspectRatio(1,contentMode:.fit).overlay{GeometryReader{box in ProductPhoto(item:p,icon:shop.departments[p.cat]?.icon ?? "basket").frame(width:box.size.width*0.82,height:box.size.height*0.82).position(x:box.size.width/2,y:box.size.height/2)}}
                 .clipShape(RoundedRectangle(cornerRadius:22)).onTapGesture{panel = .product(p.id)}
                 .accessibilityElement().accessibilityLabel(p.name).accessibilityAddTraits(.isButton).accessibilityIdentifier("open-\(p.id)")
                 .overlay(alignment:.topTrailing){Button{shop.favorite(p)} label:{Glyph(shop.memory.favorites.contains(p.id) ? "heart" : "heart-o",24).foregroundStyle(shop.memory.favorites.contains(p.id) ? .red : Color.muted).frame(width:36,height:36)}.padding(6).accessibilityLabel("В избранное")}
                 .overlay(alignment:.bottomTrailing){qty(p).padding(10)}
                 .overlay(alignment:.topLeading){if p.old>p.price {Text("−\(Int(((1-p.price/p.old)*100).rounded()))%").font(type(12,700)).foregroundStyle(.white).padding(4).tile(.red,8).padding(8)}}
-            HStack{Text(rub(p.price)).font(type(19,800));if p.old>p.price{Text(rub(p.old)).strikethrough().font(type(12)).foregroundStyle(Color.muted)}}.padding(.top,6)
+            HStack{Text(rub(p.price)).font(type(19,800));if p.old>p.price{Text(rub(p.old)).strikethrough().font(type(12)).foregroundStyle(Color.muted)}}.padding(.top,8)
             Button(p.name){panel = .product(p.id)}.font(type(14)).lineLimit(2).multilineTextAlignment(.leading)
-            Text(shop.storeName(p)+(p.kg ? " · за 1 кг" : "")+(shop.available(p)<=5 ? " · осталось "+amount(shop.available(p),p.kg) : "")).font(type(12)).foregroundStyle(Color.muted)
+            HStack(alignment:.top,spacing:3){Text(shop.storeName(p)+(p.kg ? " · за 1 кг" : "")).foregroundStyle(Color.muted);if shop.available(p)<=5 {Text("осталось "+amount(shop.available(p),p.kg)).foregroundStyle(Color(hex:"D98A00"))}}.font(type(12))
             Spacer(minLength:0)
         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
     }
@@ -163,6 +163,6 @@ struct Market:View {
         return HStack(spacing:4){
             if q>0 {Button{shop.adjust(p,-1)}label:{Glyph("minus",15).frame(width:30,height:36)}.accessibilityLabel("Меньше");Text(p.kg ? amount(q,true) : "\(Int(q))").font(type(13,700))}
             Button{shop.adjust(p,1)}label:{HStack{Glyph("plus",16);if full && q==0 {Text("В корзину").font(type(15,700))}}.padding(.horizontal,full ? 8 : 0).frame(minWidth:q==0 ? 42 : 30,minHeight:42)}.disabled(q>=shop.available(p)).accessibilityIdentifier("add-\(p.id)").accessibilityLabel("В корзину")
-        }.foregroundStyle(.white).background(Color.accentBlue,in:Capsule())
+        }.frame(maxWidth:full ? .infinity : nil,minHeight:full ? 48 : 42).foregroundStyle(.white).background(Color.accentBlue,in:RoundedRectangle(cornerRadius:full ? 14 : 24))
     }
 }

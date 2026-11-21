@@ -44,7 +44,7 @@ struct AddressPage:View {
     @State var a:Address
     @State var error=""
     init(shop:Shop,back:@escaping ()->Void){self.shop=shop;self.back=back;_a=State(initialValue:shop.memory.address)}
-    var body:some View {ScrollView{VStack(alignment:.leading,spacing:16){Button(action:back){Glyph("back",26)}.accessibilityLabel("Назад");Text("Адрес доставки").font(type(30,800));AddressFields(address:$a);Text(error).foregroundStyle(.red);Button{if let e=addressError(a){error=e}else{shop.memory.address=a;back()}}label:{Text("Сохранить").primaryAction()}}.padding(16).padding(.bottom,100)}}
+    var body:some View {ScrollView{VStack(alignment:.leading,spacing:16){Button(action:back){Glyph("back",26)}.accessibilityLabel("Назад");Text("Адрес доставки").font(type(30,800));AddressFields(address:$a);Text(error).foregroundStyle(.red);Button{if let e=addressError(a){error=e}else{shop.memory.address=a;back()}}label:{Text("Сохранить").font(type(18,700)).foregroundStyle(.white).padding(.horizontal,30).frame(height:58).background(Color.accentBlue,in:Capsule())}.frame(maxWidth:.infinity)}.padding(16).padding(.bottom,100)}}
 }
 struct LoginPage:View {
     let shop:Shop,back:()->Void
@@ -56,11 +56,11 @@ struct LoginPage:View {
     @State var visible=false
     var body:some View {ScrollView{VStack(alignment:.leading,spacing:16){
         Button(action:back){Glyph("back",26)}.accessibilityLabel("Назад")
-        Picker("Аккаунт",selection:$register){Text("Войти").tag(false);Text("Зарегистрироваться").tag(true)}.pickerStyle(.segmented)
+        HStack(spacing:4){ForEach([false,true],id:\.self){tab in Button{register=tab;error=""}label:{Text(tab ? "Зарегистрироваться":"Войти").font(type(15,700)).lineLimit(1).minimumScaleFactor(0.82).frame(maxWidth:.infinity,minHeight:52).foregroundStyle(tab==register ? .white:Color.muted).tile(tab==register ? .accentBlue:.clear,16)}}}.padding(4).tile(.surface,20)
         Text(register ? "Создать аккаунт":"Вход в аккаунт").font(type(28,800))
         if register {Field(label:"Имя",value:$name)};Field(label:"Телефон",value:$phone).keyboardType(.phonePad)
         HStack{if visible {TextField("Пароль",text:$password)}else{SecureField("Пароль",text:$password)};Button{visible.toggle()}label:{Glyph(visible ? "eyeoff":"eye",19)}}.padding().tile()
-        Text(error).foregroundStyle(.red);Button(action:submit){Text(register ? "Зарегистрироваться":"Войти").primaryAction()}
+        Text(error).foregroundStyle(.red);Button(action:submit){Text(register ? "Создать аккаунт":"Войти").primaryAction()}
     }.padding(18)}}
     func submit(){
         let number=phoneDigits(phone)
@@ -105,7 +105,7 @@ struct Checkout:View {
         Button(action:back){Glyph("back",26)}.accessibilityLabel("Назад");Text("Оформление заказа").font(type(24,800))
         heading(1,"Адрес доставки · Грозный");AddressFields(address:$a,photosLocked:hasPhotos)
         heading(2,"Контакты");Field(label:"Имя",value:$a.name);Field(label:"Телефон",value:$a.phone).keyboardType(.phonePad)
-        heading(3,"Время по Грозному");HStack{if openAt(Date()){option("Как можно скорее","60–90 мин",!scheduled){scheduled=false}};option("Выбрать время","",scheduled){scheduled=true}}
+        heading(3,"Время по Грозному");HStack{if openAt(Date()){option("Как можно скорее","60–90 мин",!scheduled){scheduled=false}.accessibilityIdentifier("asap")};option("Выбрать время","",scheduled){time=max(time,deliveryRange().lowerBound);scheduled=true}.accessibilityIdentifier("choose-time")}
         if scheduled {scheduleFields}
         heading(4,"Оплата");HStack{option("СБП","При получении",pay=="СБП","qr"){pay="СБП"};option("Наличными","При получении",pay=="Наличными","cash"){pay="Наличными"}}
         if pay=="Наличными"{Field(label:"С какой суммы сдача",value:$change).keyboardType(.numberPad)}
@@ -129,7 +129,7 @@ struct Checkout:View {
     }
     func totalRow(_ name:String,_ value:Int)->some View {HStack{Text(name);Spacer();Text(rub(Double(value))).font(type(15,700))}}
     func heading(_ n:Int,_ title:String)->some View {HStack{Text("\(n)").font(type(12,700)).foregroundStyle(Color.surface).frame(width:24,height:24).background(Color.ink,in:Circle());Text(title).font(type(16,700))}.padding(.top,8)}
-    func option(_ title:String,_ sub:String,_ selected:Bool,_ icon:String?=nil,action:@escaping ()->Void)->some View {Button(action:action){VStack(alignment:.leading,spacing:5){if let icon{Glyph(icon,22)};Text(title).font(type(14,700));if !sub.isEmpty{Text(sub).font(type(12))}}.padding(12).frame(maxWidth:.infinity,alignment:.leading).tile(selected ? .tintSoft:.surface,12).overlay(RoundedRectangle(cornerRadius:12).stroke(selected ? Color.accentBlue:Color.line))}}
+    func option(_ title:String,_ sub:String,_ selected:Bool,_ icon:String?=nil,action:@escaping ()->Void)->some View {Button(action:action){VStack(alignment:.leading,spacing:5){if let icon{Glyph(icon,22)};Text(title).font(type(14,700));if !sub.isEmpty{Text(sub).font(type(12))}}.padding(.horizontal,12).frame(maxWidth:.infinity,minHeight:icon==nil ? 52:92,alignment:icon==nil ? .center:.leading).tile(selected ? .tintSoft:.surface,12).overlay(RoundedRectangle(cornerRadius:12).stroke(selected ? Color.accentBlue:Color.line))}}
     @MainActor func send() async {
         guard !sending else{return}
         if let e=addressError(a){error=e;return}
