@@ -1,0 +1,4 @@
+    iPhone 18 Pro (A8CE73D2-F54C-4FB2-B688-BC6BD7612FA8) (Booted) 
+Xcode 27.2
+Build version 27B52
+27.2
