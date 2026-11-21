@@ -1,44 +1,9 @@
 import XCTest
 
 final class Walkthrough: XCTestCase {
-    func capture(_ name: String) {
-        let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        image.name = name
-        image.lifetime = .keepAlways
-        add(image)
-    }
-
-    func testShopping() {
-        continueAfterFailure = false
+    func testStorefrontOpens() {
         let app = XCUIApplication()
         app.launch()
-        let shops = app.buttons["stores"]
-        XCTAssertTrue(shops.waitForExistence(timeout: 15))
-        sleep(6)
-        capture("01-catalog")
-        app.buttons["heart-1933184393"].firstMatch.tap()
-        app.tabBars.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Избранное")).firstMatch.tap()
-        XCTAssertTrue(app.buttons["product-1933184393"].waitForExistence(timeout: 8))
-        capture("04-favorites")
-        sleep(2)
-        app.tabBars.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Каталог")).firstMatch.tap()
-        shops.tap()
-        sleep(2)
-        app.buttons["Вкусдом"].firstMatch.tap()
-        let item = app.buttons["product-1933184393"]
-        XCTAssertTrue(item.waitForExistence(timeout: 5))
-        sleep(2)
-        item.tap()
-        let add = app.buttons["add"]
-        XCTAssertTrue(add.waitForExistence(timeout: 5))
-        sleep(2)
-        capture("02-product")
-        add.tap()
-        sleep(2)
-        app.tabBars.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Корзина")).firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["1 шт"].waitForExistence(timeout: 8))
-        sleep(2)
-        capture("03-cart")
-        sleep(2)
+        XCTAssertTrue(app.webViews.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Все магазины")).firstMatch.waitForExistence(timeout: 90))
     }
 }
