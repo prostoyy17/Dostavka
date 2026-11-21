@@ -4,10 +4,12 @@ on:
     branches: [ios/simulator-preview]
     paths: ['ios/**', '.github/workflows/ios-preview.yml']
 permissions:
-  contents: read
+  contents: write
 jobs:
   preview:
-    runs-on: macos-15
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -24,3 +26,12 @@ jobs:
           name: MayrMarket-iPhone
           path: ios/output/
           if-no-files-found: error
+      - name: Publish the verified simulator media on the preview branch
+        run: |
+          mkdir -p preview/ios27
+          cp ios/output/* preview/ios27/
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add preview/ios27
+          git commit -m "Save iOS simulator walkthrough"
+          git push

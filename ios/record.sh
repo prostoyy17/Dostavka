@@ -1,11 +1,15 @@
 set -euo pipefail
-device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; ds=json.load(sys.stdin)["devices"]; print(next(d["udid"] for k in reversed(sorted(ds)) if "iOS" in k for d in ds[k] if d["name"].startswith("iPhone")))')
+xcodebuild -version
+device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; ds=json.load(sys.stdin)["devices"]["com.apple.CoreSimulator.SimRuntime.iOS-27-2"]; print(next(d["udid"] for d in ds if d["name"]=="iPhone 18 Pro"))')
 xcrun simctl boot "$device"
 xcrun simctl bootstatus "$device" -b
 xcrun simctl status_bar "$device" override --time 09:41
 build=(-project MayrMarket.xcodeproj -scheme MayrMarket -destination "id=$device" -derivedDataPath build -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO)
 xcodebuild "${build[@]}" build-for-testing
 mkdir -p output
+xcrun simctl list devices | rg -F "$device" > output/device.txt
+xcodebuild -version >> output/device.txt
+xcrun simctl getenv "$device" SIMULATOR_RUNTIME_VERSION >> output/device.txt
 # Open the app before recording so the first frame is the catalog.
 xcrun simctl install "$device" build/Build/Products/Debug-iphonesimulator/MayrMarket.app
 xcrun simctl launch "$device" ru.mayrmarket.preview
@@ -24,8 +28,8 @@ root=pathlib.Path('attachments')
 for section in json.loads((root/'manifest.json').read_text()):
     for attachment in section['attachments']:
         name=attachment['suggestedHumanReadableName']
-        for prefix in ('01-catalog','02-product','03-cart'):
+        for prefix in ('01-catalog','02-product','03-cart','04-favorites'):
             if prefix in name:
                 shutil.copyfile(root/attachment['exportedFileName'],f'output/{prefix}.png')
 PY
-for screen in 01-catalog 02-product 03-cart; do test -s "output/$screen.png"; done
+for screen in 01-catalog 02-product 03-cart 04-favorites; do test -s "output/$screen.png"; done
