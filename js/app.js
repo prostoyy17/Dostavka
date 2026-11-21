@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795203870';
+const BUILD = '1795256577';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -114,7 +114,6 @@ const maxOf = p => { const s = stockOf(p); return p && p.kg && s >= KG_STEP ? Ma
 const firstOf = p => p && p.kg ? Math.min(1, maxOf(p)) : 1;
 const fmtQty = (p, q) => p && p.kg ? `${String(q).replace('.', ',')} кг` : `${q} шт`;
 const stepQty = (p, q) => p && p.kg ? Math.round(Math.round(q / KG_STEP) * KG_STEP * 10) / 10 : Math.round(q);
-const WEIGHT_NOTE = 'Весовые товары взвешивают в магазине, поэтому вес и сумма могут немного отличаться.';
 function setQty(id, qty) {
   const p = byId[id];
   const max = maxOf(p);
@@ -165,8 +164,7 @@ function cardHTML(p) {
 }
 function kgPickHTML(p) {
   const q = state.cart[p.id] || 0;
-  return `<div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>≈ ${rubP(Math.round(p.price * q))}</b>` : `${rubP(p.price)} за 1 кг · ${maxOf(p) < KG_STEP ? `доступно ${fmtQty(p, maxOf(p))}` : 'шаг 0,5 кг'}`}</div>
-    <div class="kgpick__note">${WEIGHT_NOTE}</div>`;
+  return `<div class="kgpick__sum">${q ? `В корзине ${fmtQty(p, q)} — <b>≈ ${rubP(Math.round(p.price * q))}</b>` : `${rubP(p.price)} за 1 кг · ${maxOf(p) < KG_STEP ? `доступно ${fmtQty(p, maxOf(p))}` : 'шаг 0,5 кг'}`}</div>`;
 }
 function refreshQty(id) {
   $$(`[data-action-for="${id}"]`).forEach(el => { el.innerHTML = actionHTML(byId[id], el.dataset.size || ''); });
@@ -724,12 +722,11 @@ function openPoints() {
           </div>
           ${POINTS.map(p => {
             const open = isOpen(p);
-            const n = PRODUCTS.filter(x => x.stock[p.id] > 0 && (selectedStore === null || x.offers.some(o => o[0] === selectedStore))).length;
             return `<button class="pt ${p.id === sel ? 'active' : ''}" data-pick="${p.id}">
               <span class="pt__city">${p.city}</span>
               <span class="pt__addr">Доставка по Грозному</span>
               <span class="pt__eta">${p.eta}<small class="pt__badge ${open ? '' : 'closed'}">${open ? 'Открыто' : 'Закрыто'}</small></span>
-              <span class="pt__info">${hours(p)} · ${n.toLocaleString('ru-RU')} товаров · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно${p.minOrder ? ` · заказ от ${rub(p.minOrder)}` : ''}</span>
+              <span class="pt__info">${hours(p)} · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно${p.minOrder ? ` · заказ от ${rub(p.minOrder)}` : ''}</span>
             </button>`;
           }).join('')}
           <button class="btn btn--primary btn--block" data-confirm-point>Готово</button>
@@ -797,7 +794,6 @@ function cartHTML() {
         <div class="totals__row"><span>${t.isPickup ? 'Самовывоз' : 'Доставка'}</span><b>${t.delivery ? rub(t.delivery) : 'Бесплатно'}</b></div>
         <div class="totals__row totals__row--total"><span>Итого</span><b>${rub(t.total)}</b></div>
       </div>
-      ${t.okLines.some(l => l.p.kg) ? `<div class="weight-note">${WEIGHT_NOTE}</div>` : ''}
       ${!t.minOk ? `<div class="warn-box">Минимальный заказ ${rub(t.pt.minOrder)}, не хватает ${rub(t.pt.minOrder - t.subtotal)}</div>` : ''}
       <button class="btn btn--primary btn--block btn--between" data-action="checkout" ${t.minOk && t.okLines.length ? '' : 'disabled'}><span>Оформить</span><span>${rub(t.total)}</span></button>
     </div>
@@ -961,7 +957,6 @@ function openCheckout(selectedPhotos = [], timeChoice = null) {
         <div class="summary-items">
           ${t.okLines.map(l => `<div class="summary-item"><span class="summary-item__img" style="background:${l.p.img ? '#fff' : catById[l.p.cat].color}">${pic(l.p)}</span><span class="summary-item__name">${esc(l.p.name)}</span><span>${l.p.kg ? fmtQty(l.p, l.qty) : '×' + l.qty}</span><b>${l.p.kg ? '≈ ' : ''}${rubP(l.sum)}</b></div>`).join('')}
         </div>
-        ${t.okLines.some(l => l.p.kg) ? `<div class="weight-note">${WEIGHT_NOTE}</div>` : ''}
         <div class="totals" id="checkoutTotals"></div>
         <div id="sendStatus" role="status"></div>
         <button class="btn btn--primary btn--block btn--between" type="submit" id="payBtn"></button>

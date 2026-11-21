@@ -319,8 +319,9 @@ img { display: block; }
 .slot.active { border-color: var(--accent); background: var(--accent-soft); }
 .slot small { display: block; font-weight: 500; color: var(--text-2); font-size: 11px; }
 .slots .slot { flex: 1; min-width: 0; min-height: 44px; text-align: center; }
-.delivery-when { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.delivery-when label { min-width: 0; color: var(--text-2); font-size: 12px; }
+.delivery-when { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.delivery-when label { display: flex; flex-direction: column; min-width: 0; color: var(--text-2); font-size: 12px; }
+.delivery-when input[type="time"] { -webkit-appearance: none; appearance: none; max-width: 100%; }
 .delivery-when select, .delivery-when input { box-sizing: border-box; width: 100%; min-width: 0; height: 44px; margin-top: 3px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-size: 16px; }
 #timeError:empty { display: none; }
 .toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; cursor: pointer; font-size: 14px; }
@@ -823,9 +824,6 @@ html { background: var(--bg); }
 .kgpick__sum b { color: var(--text); }
 .stepper--round span { min-width: 20px; white-space: nowrap; padding: 0 2px; }
 
-.kgpick__note, .weight-note { font-size: 12.5px; line-height: 1.4; color: var(--text-3); }
-.weight-note { padding: 10px 12px; margin: 0 0 12px; border-radius: 12px; background: var(--surface-2); }
-.cart-page .weight-note { background: var(--surface); }
 
 /* «+» и «−» — отдельные кружки, чтобы было видно, куда нажимаешь */
 .stepper { gap: 6px; padding: 4px; align-items: center; }
