@@ -7,7 +7,7 @@ extension Color {
     static func adaptive(_ light:String,_ dark:String)->Color {
         Color(UIColor { traits in UIColor(Color(hex:traits.userInterfaceStyle == .dark ? dark : light)) })
     }
-    static let paper=adaptive("EEEDE8","000000"), surface=adaptive("FFFFFF","1C1C1F"), soft=adaptive("F4F3EF","29292D"), ink=adaptive("0E1433","F5F5F7"), muted=adaptive("8E92A6","A0A0AA"), accentBlue=adaptive("0033B0","4779FF"), tintSoft=adaptive("E3E9F8","202E52"), line=adaptive("E1DFD7","38383C")
+    static let paper=adaptive("EEEDE8","000000"), surface=adaptive("FFFFFF","161618"), soft=adaptive("F4F3EF","1F1F22"), ink=adaptive("0E1433","FFFFFF"), muted=adaptive("8E92A6","8E8E93"), accentBlue=adaptive("0033B0","0033B0"), tintSoft=adaptive("E3E9F8","1A2A55"), line=adaptive("E1DFD7","2A2A2E")
 }
 func type(_ size:CGFloat,_ weight:Int=400)->Font { .custom("Onest\(weight)",fixedSize:size) }
 struct Glyph:View {

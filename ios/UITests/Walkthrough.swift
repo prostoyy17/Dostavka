@@ -4,7 +4,7 @@ final class Walkthrough:XCTestCase {
     func testNativeShopping() {
         continueAfterFailure=false
         let app=XCUIApplication()
-        app.launchArguments += ["-AppleLanguages","(ru)","-AppleLocale","ru_RU"]
+        app.launchArguments += ["-RecordShopping","-AppleLanguages","(ru)","-AppleLocale","ru_RU"]
         app.launch()
         func tap(_ label:String) {
             let button=app.buttons[label].firstMatch
@@ -21,8 +21,11 @@ final class Walkthrough:XCTestCase {
         tap("stores");capture("02-stores");tap("store-0");tap("Готово")
         tap("open-2");capture("03-item");tap("Сохранить товар");tap("add-2");tap("Закрыть")
         tap("tab-favorites");capture("04-favorites");tap("tab-account");capture("05-account")
-        tap("tab-cart");capture("06-cart");tap("checkout");capture("07-checkout")
+        tap("account-address");capture("10-address");tap("Назад");tap("account-settings");tap("Назад");tap("account-about");tap("Назад");tap("tab-cart");capture("06-cart");tap("checkout");capture("07-checkout")
         app.swipeUp();Thread.sleep(forTimeInterval:1);capture("08-time")
         app.swipeUp();Thread.sleep(forTimeInterval:1);capture("09-summary")
+        let send=app.buttons["send-order"]
+        for _ in 0..<6 where !send.isHittable {app.swipeUp()}
+        tap("send-order");tap("Продолжить");capture("11-orders")
     }
 }

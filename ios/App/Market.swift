@@ -42,8 +42,8 @@ struct Market:View {
                         }.padding(.horizontal,16).padding(.top,page == .catalog ? 8 : 24).padding(.bottom,102).frame(maxWidth:.infinity,alignment:.leading)
                     }.id(page).scrollDismissesKeyboard(.interactively)
                 }
-            }.frame(maxWidth:.infinity,maxHeight:.infinity)
-            if ![.checkout,.login].contains(page) && !searching { tabbar }
+            }.frame(maxWidth:.infinity,maxHeight:.infinity).accessibilityHidden(panel != nil)
+            if ![.checkout,.login].contains(page) && !searching { tabbar.accessibilityHidden(panel != nil) }
             if let panel {
                 Color.black.opacity(0.49).ignoresSafeArea().onTapGesture {self.panel=nil}
                 sheetBody(panel)
@@ -58,6 +58,12 @@ struct Market:View {
             if categoryRows.isEmpty {
                 for p in shop.catalog.items where !p.photo.isEmpty && (categoryRows[p.cat]?.count ?? 0)<12 {categoryRows[p.cat,default:[]].append(p)}
             }
+            filter()
+        }
+        .task{await shop.refresh()}
+        .onChange(of:shop.digest){_,_ in
+            categoryRows=[:]
+            for p in shop.catalog.items where !p.photo.isEmpty && (categoryRows[p.cat]?.count ?? 0)<12 {categoryRows[p.cat,default:[]].append(p)}
             filter()
         }
         .onChange(of:query){_,_ in category="all";sub="";filter()}
@@ -103,7 +109,7 @@ struct Market:View {
             ForEach(shop.catalog.categories){c in circle(c.id,c.name,c.icon,c.color)}
         }}.scrollIndicators(.hidden)
         if home {
-            Text("Рекомендации для вас").font(type(23,800)).tracking(-0.6); grid(shop.recs)
+            Text("Рекомендации для вас").font(type(24,800)).tracking(-0.6); grid(shop.recs)
             ForEach(shop.catalog.categories){c in
                 if let items=categoryRows[c.id], !items.isEmpty {
                     HStack{Text(c.name).font(type(22,800));Spacer();Button("Все"){chooseCat(c.id)}}
@@ -126,10 +132,10 @@ struct Market:View {
         Button{chooseCat(id)} label:{VStack(spacing:6){
             CategoryImage(icon:icon).frame(width:44,height:44).frame(width:70,height:70).background(Color(hex:color),in:Circle()).overlay(Circle().strokeBorder(id==category ? Color.accentBlue : .clear,lineWidth:3))
             Text(name).font(type(12,600)).lineLimit(2).multilineTextAlignment(.center).foregroundStyle(id==category ? Color.accentBlue : Color.ink)
-        }.frame(width:72)}.accessibilityIdentifier("cat-"+id)
+        }.frame(width:76)}.accessibilityIdentifier("cat-"+id)
     }
     func pill(_ name:String,_ icon:String,_ target:Panel)->some View {Button{panel=target}label:{HStack(spacing:5){Glyph(icon,14);Text(name).font(type(12,600)).lineLimit(1);Glyph("down",10)}.frame(maxWidth:.infinity,minHeight:40).tile(.surface,24)}}
-    func grid(_ items:[Item])->some View {LazyVGrid(columns:[GridItem(.flexible(),spacing:12),GridItem(.flexible())],alignment:.leading,spacing:20){ForEach(items){card($0)}}}
+    func grid(_ items:[Item])->some View {LazyVGrid(columns:[GridItem(.flexible(),spacing:14),GridItem(.flexible())],alignment:.leading,spacing:22){ForEach(items){card($0)}}}
     func card(_ p:Item)->some View {
         VStack(alignment:.leading,spacing:4) {
             Color.white.aspectRatio(1,contentMode:.fit).overlay{ProductPhoto(item:p,icon:shop.departments[p.cat]?.icon ?? "basket").padding(16)}
@@ -138,7 +144,7 @@ struct Market:View {
                 .overlay(alignment:.topTrailing){Button{shop.favorite(p)} label:{Glyph(shop.memory.favorites.contains(p.id) ? "heart" : "heart-o",24).foregroundStyle(shop.memory.favorites.contains(p.id) ? .red : Color.muted).frame(width:36,height:36)}.padding(6).accessibilityLabel("В избранное")}
                 .overlay(alignment:.bottomTrailing){qty(p).padding(10)}
                 .overlay(alignment:.topLeading){if p.old>p.price {Text("−\(Int(((1-p.price/p.old)*100).rounded()))%").font(type(12,700)).foregroundStyle(.white).padding(4).tile(.red,8).padding(8)}}
-            HStack{Text(rub(p.price)).font(type(18,800));if p.old>p.price{Text(rub(p.old)).strikethrough().font(type(12)).foregroundStyle(Color.muted)}}.padding(.top,6)
+            HStack{Text(rub(p.price)).font(type(19,800));if p.old>p.price{Text(rub(p.old)).strikethrough().font(type(12)).foregroundStyle(Color.muted)}}.padding(.top,6)
             Button(p.name){panel = .product(p.id)}.font(type(14)).lineLimit(2).multilineTextAlignment(.leading)
             Text(shop.storeName(p)+(p.kg ? " · за 1 кг" : "")+(shop.available(p)<=5 ? " · осталось "+amount(shop.available(p),p.kg) : "")).font(type(12)).foregroundStyle(Color.muted)
             Spacer(minLength:0)

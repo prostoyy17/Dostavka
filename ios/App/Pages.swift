@@ -79,12 +79,12 @@ extension Market {
             Button{go(.checkout)}label:{HStack{Text("Оформить");Spacer();Text(rub(Double(shop.total)))}.primaryAction()}.accessibilityIdentifier("checkout")
         }
     }
-    func accountRow(_ label:String,_ icon:String,_ target:Page,_ detail:String="")->some View {Button{go(target)}label:{HStack(spacing:14){Glyph(icon).frame(width:40,height:40).tile(.soft,12);VStack(alignment:.leading){Text(label).font(type(detail.isEmpty ? 16:12,600));if !detail.isEmpty{Text(detail).font(type(16,700))}};Spacer();Glyph("chev",16)}.padding(14).tile()}}
+    func accountRow(_ label:String,_ icon:String,_ target:Page,_ detail:String="")->some View {Button{go(target)}label:{HStack(spacing:14){Glyph(icon).frame(width:40,height:40).tile(.soft,12);VStack(alignment:.leading){Text(label).font(type(detail.isEmpty ? 16:12,600));if !detail.isEmpty{Text(detail).font(type(16,700))}};Spacer();Glyph("chev",16)}.padding(14).tile()}.accessibilityIdentifier("account-"+target.rawValue)}
     @ViewBuilder var accountView:some View {
         switch page {
         case .account:
             if let u=shop.memory.accounts.first(where:{$0.phone==shop.memory.signedIn}) {pair(u.name,u.phone).padding().tile()}
-            else {Button{go(.login)}label:{Text("Войти или зарегистрироваться").primaryAction()}}
+            else {Button{go(.login)}label:{Text("Войти или зарегистрироваться").font(type(17,700)).foregroundStyle(.white).padding(.horizontal,30).frame(height:58).background(Color.accentBlue,in:Capsule())}.frame(maxWidth:.infinity).padding(.bottom,22)}
             accountRow("Адрес доставки","pin",.address,shop.memory.address.street.isEmpty ? "Не указан" : shop.memory.address.street)
             VStack(spacing:1){accountRow("Мои заказы","receipt",.orders);accountRow("Настройки","gear",.settings);accountRow("О сервисе","info",.about)}
             if shop.memory.signedIn != nil {Button("Выйти из аккаунта"){shop.memory.signedIn=nil}}
