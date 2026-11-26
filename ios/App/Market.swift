@@ -8,7 +8,7 @@ import SwiftUI
         }
     }
 }
-enum Page: String { case catalog, favorites, cart, account, address, settings, about, orders, login, checkout }
+enum Page: String { case catalog, search, favorites, cart, account, address, settings, about, orders, login, checkout }
 enum Panel: Equatable { case stores, product(Int), filters, sort, subs, receipt(String) }
 struct UndoNotice: Identifiable {
     let id = UUID()
@@ -43,6 +43,36 @@ struct Market: View {
     @AppStorage("native-dark") var dark = false
     @State var rows: [Item] = []
     @State var categoryRows: [String: [Item]] = [:]
+    @State var scopeCategories: Set<String> = []
+    @State var scopeSubs: [String: Set<String>] = [:]
+    struct BrowseSelection {
+        let category: String, sub: String, order: String
+        let photoOnly: Bool, kgOnly: Bool
+    }
+    @State var browseSelection: BrowseSelection?
+    func openSearch() {
+        browseSelection = BrowseSelection(category: category, sub: sub, order: order, photoOnly: photoOnly, kgOnly: kgOnly)
+        category = "all"
+        sub = ""
+        query = ""
+        order = "Популярные"
+        photoOnly = false
+        kgOnly = false
+        go(.search)
+    }
+    func updateScope() {
+        var groups: [String: Set<String>] = [:]
+        for item in shop.catalog.items where matchesStore(item) {
+            groups[item.cat, default: []].insert(item.sub)
+        }
+        scopeCategories = Set(groups.keys)
+        scopeSubs = groups
+        filter()
+    }
+    func matchesStore(_ item: Item) -> Bool {
+        guard let store = shop.memory.store else { return true }
+        return item.offers.contains { $0.store == store }
+    }
     @FocusState var searching: Bool
     func go(_ p: Page) {
         searching = false
@@ -51,15 +81,26 @@ struct Market: View {
         page = p
     }
     func back() {
+        if page == .search, let saved = browseSelection {
+            query = ""
+            category = saved.category
+            sub = saved.sub
+            order = saved.order
+            photoOnly = saved.photoOnly
+            kgOnly = saved.kgOnly
+            browseSelection = nil
+            searching = false
+        }
         page = path.popLast() ?? .catalog
+        if page == .catalog { filter() }
         panel = nil
     }
     var home: Bool {
         shop.memory.store == nil && category == "all" && query.isEmpty
     }
     var selectedName: String {
-        shop.memory.store.map {
-            shop.catalog.stores[$0]
+        shop.memory.store.flatMap {
+            shop.catalog.stores.indices.contains($0) ? shop.catalog.stores[$0] : nil
         } ?? "Все магазины"
     }
     var body: some View {
@@ -81,6 +122,7 @@ struct Market: View {
                             }
                             switch page {
                             case .catalog: catalogView
+                            case .search: searchView
                             case .favorites: favoritesView
                             case .cart: cartView
                             case .account, .settings, .about, .orders: accountView
@@ -96,7 +138,7 @@ struct Market: View {
                     }.id(page).scrollDismissesKeyboard(.interactively) }
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity).accessibilityHidden(panel != nil)
-            if ![.checkout, .login].contains(page) && !searching {
+            if ![.checkout, .login, .search].contains(page) && !searching {
                 tabbar.accessibilityHidden(panel != nil)
             }
             if let notice, panel == nil {
@@ -135,7 +177,7 @@ struct Market: View {
                         categoryRows[p.cat, default: []].append(p)
                     }
                 }
-                filter()
+                updateScope()
             }
             .task {
                 await shop.refresh()
@@ -145,11 +187,10 @@ struct Market: View {
                 for p in shop.catalog.items where !p.photo.isEmpty && (categoryRows[p.cat]?.count ?? 0) < 12 {
                     categoryRows[p.cat, default: []].append(p)
                 }
-                filter()
+                updateScope()
             }
-            .onChange(of: query) { _, _ in category = "all"
-                sub = ""
-                filter()
+            .onChange(of: query) { _, _ in
+                if page == .search { filter() }
             }
     }
     var backButton: some View {
@@ -195,16 +236,20 @@ struct Market: View {
         Text(title).font(type(30, 800)).tracking(-1)
     }
     func filter() {
-        let words = query.lowercased().replacingOccurrences(of: "ё", with: "е").split(separator: " ")
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if page == .search && term.isEmpty {
+            rows = []
+            return
+        }
+        let words = term.lowercased().replacingOccurrences(of: "ё", with: "е").split(separator: " ")
         var list = shop.catalog.items.filter { p in
+            guard matchesStore(p), (category == "all" || p.cat == category), sub.isEmpty || sub == p.sub, !photoOnly || !p.photo.isEmpty, !kgOnly || p.kg else { return false }
+            if words.isEmpty { return true }
             let hay = (p.name + " " + p.sub + " " + (shop.departments[p.cat]?.name ?? "")).lowercased().replacingOccurrences(
                 of: "ё",
                 with: "е"
             )
-            return (shop.memory.store == nil || p.offers.contains {
-                $0.store == shop.memory.store
-            }) && (category == "all" || p.cat == category) && (sub.isEmpty || sub == p.sub) &&
-                (!photoOnly || !p.photo.isEmpty) && (!kgOnly || p.kg) && words.allSatisfy {
+            return words.allSatisfy {
                     hay.contains($0)
                 }
         }
@@ -231,32 +276,36 @@ struct Market: View {
         filter()
     }
     @ViewBuilder var catalogView: some View {
-        Button { draftStore = shop.memory.store
-            panel = .stores
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) { Text(selectedName).font(type(21, 800))
-                    Glyph("down", 14)
-                }
-                HStack(spacing: 6) { Circle().fill(.green).frame(width: 8, height: 8)
-                    Text(shop.memory.address.street.isEmpty ? "Сегодня до 01:00 · 60–90 мин" : shop.memory.address.street)
-                        .font(type(14))
-                }
+        VStack(alignment: .leading, spacing: 5) {
+            Button {
+                draftStore = shop.memory.store
+                panel = .stores
+            } label: {
+                HStack(spacing: 8) {
+                    Text(selectedName).font(type(21, 800))
+                    Text("Сменить").font(type(12, 700)).foregroundStyle(Color.accentBlue)
+                    Glyph("down", 12)
+                }.frame(minHeight: 34).contentShape(Rectangle())
+            }.accessibilityIdentifier("stores")
+            Button { go(.address) } label: {
+                HStack(spacing: 6) {
+                    Circle().fill(.green).frame(width: 8, height: 8)
+                    Text(shop.memory.address.street.isEmpty ? "Указать адрес" : shop.memory.address.street)
+                        .lineLimit(1).truncationMode(.tail)
+                    Text("· 60–90 мин").fixedSize()
+                }.font(type(14)).contentShape(Rectangle())
             }
-        }.accessibilityIdentifier("stores")
-        HStack(spacing: 12) { Glyph("search", 20).foregroundStyle(Color.muted)
-            TextField("Найти товар", text: $query).focused($searching).submitLabel(.search)
-            if !query.isEmpty {
-                Button { query = ""
-                    searching = false
-                } label: {
-                    Glyph("x", 16)
-                }
-            }
-        }.padding(.horizontal, 16).frame(height: 48).tile()
+        }
+        Button(action: openSearch) {
+            HStack(spacing: 12) {
+                Glyph("search", 20)
+                Text("Найти товар")
+                Spacer()
+            }.foregroundStyle(Color.muted).padding(.horizontal, 16).frame(height: 48).tile()
+        }.accessibilityIdentifier("open-search")
         ScrollView(.horizontal) { HStack(alignment: .top, spacing: 8) {
             circle("all", "Все товары", "cart", "ffffff")
-            ForEach(shop.catalog.categories) { c in
+            ForEach(shop.catalog.categories.filter { scopeCategories.contains($0.id) }) { c in
                 circle(c.id, c.name, c.icon, c.color)
             }
         }}.scrollIndicators(.hidden)
@@ -282,30 +331,46 @@ struct Market: View {
             }
         } else {
             header(!query.isEmpty ? "Поиск «\(query)»" : shop.departments[category]?.name ?? selectedName)
+            resultsView
+        }
+    }
+    @ViewBuilder var searchView: some View {
+        HStack(spacing: 8) {
+            backButton
+            HStack(spacing: 8) {
+                Glyph("search", 20).foregroundStyle(Color.muted)
+                TextField("Найти товар", text: $query).focused($searching).submitLabel(.search)
+                    .onSubmit { searching = false }
+                if !query.isEmpty {
+                    Button { query = ""; searching = true } label: { Glyph("x", 16).frame(width: 32, height: 40) }
+                        .accessibilityLabel("Очистить поиск")
+                }
+            }.padding(.horizontal, 12).frame(height: 48).tile()
+        }.onAppear { searching = true }
+        Text("Поиск · " + selectedName).font(type(14, 600)).foregroundStyle(Color.muted)
+        if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { resultsView }
+    }
+    @ViewBuilder var resultsView: some View {
+        if !rows.isEmpty || photoOnly || kgOnly || !sub.isEmpty {
             HStack(spacing: 5) {
-                if category != "all" {
+                if category != "all", !(scopeSubs[category] ?? []).subtracting([""]).isEmpty {
                     pill(sub.isEmpty ? "Подраздел" : sub, "down", .subs)
                 }
-                pill("Фильтры", "filter", .filters)
-                pill(order, "sort", .sort)
+                pill(photoOnly || kgOnly ? "Фильтры •" : "Фильтры", "filter", .filters)
+                if rows.count > 1 { pill(order, "sort", .sort) }
             }
-            Text("\(rows.count) товаров").font(type(14)).foregroundStyle(Color.muted)
-            if rows.isEmpty {
-                Text("Ничего не найдено")
-                Button("Сбросить фильтры") { query = ""
-                    category = "all"
-                    sub = ""
-                    kgOnly = false
-                    photoOnly = false
-                    shop.memory.store = nil
-                    filter()
+        }
+        if rows.isEmpty {
+            Text("Ничего не найдено").foregroundStyle(Color.muted)
+            if photoOnly || kgOnly || !sub.isEmpty {
+                Button("Сбросить фильтры") {
+                    sub = ""; kgOnly = false; photoOnly = false; filter()
                 }
             }
+        } else {
             grid(Array(rows.prefix(limit)))
             if rows.count > limit {
-                Button("Показать ещё \(min(60, rows.count - limit))") {
-                    limit += 60
-                }.primaryAction()
+                Button("Показать ещё \(min(60, rows.count - limit))") { limit += 60 }.primaryAction()
             }
         }
     }
@@ -323,6 +388,7 @@ struct Market: View {
     }
     func pill(_ name: String, _ icon: String, _ target: Panel) -> some View {
         Button {
+            searching = false
             panel = target
         } label: { HStack(spacing: 5) { Glyph(icon, 14)
             Text(name).font(type(12, 600)).lineLimit(1)
@@ -398,9 +464,12 @@ struct Market: View {
                 Button {
                     removeOne(p)
                 } label: {
-                    Glyph("minus", 15).frame(width: 30, height: 36)
+                    Glyph("minus", 16).frame(width: full ? 46 : 32, height: 44)
+                        .background(full ? Color.white.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 10)).contentShape(Rectangle())
                 }.accessibilityLabel("Меньше")
+                if full { Spacer(minLength: 0) }
                 Text(p.kg ? amount(q, true) : "\(Int(q))").font(type(13, 700))
+                if full { Spacer(minLength: 0) }
             }
             Button {
                 shop.adjust(p, 1)
@@ -408,9 +477,10 @@ struct Market: View {
                 if full && q == 0 {
                     Text("В корзину").font(type(15, 700))
                 }
-            }.padding(.horizontal, full ? 8 : 0).frame(minWidth: q == 0 ? 42 : 30, minHeight: 42) }
-                .disabled(q >= shop.available(p)).accessibilityIdentifier("add-\(p.id)").accessibilityLabel("В корзину")
-        }.frame(maxWidth: full ? .infinity : nil, minHeight: full ? 48 : 42).foregroundStyle(.white).background(
+            }.padding(.horizontal, full ? 8 : 0).frame(minWidth: full ? 46 : (q == 0 ? 42 : 32), minHeight: 44)
+                .background(full && q > 0 ? Color.white.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 10)).contentShape(Rectangle()) }
+                .opacity(q >= shop.available(p) ? 0.45 : 1).disabled(q >= shop.available(p)).accessibilityIdentifier("add-\(p.id)").accessibilityLabel(q == 0 ? "В корзину" : "Больше")
+        }.padding(.horizontal, full ? 4 : 0).frame(maxWidth: full ? .infinity : nil, minHeight: full ? 48 : 42).foregroundStyle(.white).background(
             Color.accentBlue,
             in: RoundedRectangle(cornerRadius: full ? 14 : 24)
         )

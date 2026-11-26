@@ -20,7 +20,9 @@ extension Market {
                     } label: {
                         HStack(spacing: 14) {
                             if i >= 0 {
-                                Image(i == 0 ? "musafir-clear" : "vkusdom-mark").resizable().scaledToFit().frame(
+                                Image(i == 0 ? "musafir-clear" : "vkusdom-mark")
+                                    .renderingMode(i == 0 ? .original : .template).resizable().scaledToFit()
+                                    .foregroundStyle(Color.adaptive("577460", "CBD5AA")).frame(
                                     width: 80,
                                     height: 44
                                 )
@@ -49,11 +51,16 @@ extension Market {
                 }
                 Text("09:00–01:00 · доставка 200 ₽, от 3 000 ₽ бесплатно").font(type(12)).foregroundStyle(Color.muted)
                 }.padding(14).tile(.tintSoft, 16)
-                Button { shop.memory.store = draftStore
+                Button { if shop.memory.store != draftStore {
+                    shop.memory.store = draftStore
                     category = "all"
                     query = ""
                     sub = ""
-                    filter()
+                    photoOnly = false
+                    kgOnly = false
+                    order = "Популярные"
+                    updateScope()
+                    }
                     panel = nil
                 } label: {
                     Text("Готово").primaryAction()
@@ -74,7 +81,7 @@ extension Market {
                     panel = nil
                 }}
             case .subs:
-                ScrollView { VStack { ForEach([""] + (shop.departments[category]?.subs ?? []), id: \.self) { s in choice(
+                ScrollView { VStack { ForEach([""] + (shop.departments[category]?.subs ?? []).filter { scopeSubs[category]?.contains($0) == true }, id: \.self) { s in choice(
                     s.isEmpty ? "Все" : s,
                     s == sub
                 ) { sub = s
@@ -131,7 +138,7 @@ extension Market {
                             }
                             Text("Ещё в категории").font(type(18, 700))
                             grid(Array(shop.catalog.items.lazy.filter {
-                                $0.cat == p.cat && $0.id != p.id
+                                matchesStore($0) && $0.cat == p.cat && $0.id != p.id
                             }.prefix(4)))
                         }
                     }.containerRelativeFrame(.vertical) { height, _ in
@@ -288,16 +295,29 @@ extension Market {
     func accountRow(_ label: String, _ icon: String, _ target: Page, _ detail: String = "") -> some View {
         Button {
             go(target)
-        } label: { HStack(spacing: 14) { Glyph(icon).frame(width: 40, height: 40).tile(.soft, 12)
-            VStack(alignment: .leading) { Text(label).font(type(detail.isEmpty ? 16 : 12, 600))
-                if !detail.isEmpty {
-                    Text(detail).font(type(16, 700))
+        } label: {
+            HStack(spacing: 18) {
+                Glyph(icon, 26).frame(width: 30)
+                VStack(alignment: .leading, spacing: 3) {
+                    if detail.isEmpty {
+                        Text(label).font(type(17, 500))
+                    } else {
+                        Text(label.uppercased()).font(type(12, 700)).tracking(0.7).foregroundStyle(Color.muted)
+                        Text(detail).font(type(17, 500)).lineLimit(1)
+                    }
                 }
-            }
-            Spacer()
-            Glyph("chev", 16)
-        }.padding(.horizontal, 18).frame(minHeight: 70).background(Color.surface) }
+                Spacer()
+                if target == .orders && !shop.memory.orders.isEmpty {
+                    Text("\(shop.memory.orders.count)").font(type(13, 700)).padding(.horizontal, 8)
+                        .frame(height: 24).tile(.soft, 12)
+                }
+                Glyph("chev", 16).foregroundStyle(Color.muted)
+            }.padding(.horizontal, 22).frame(minHeight: detail.isEmpty ? 64 : 86).background(Color.surface)
+        }
             .accessibilityIdentifier("account-" + target.rawValue)
+    }
+    var accountDivider: some View {
+        Rectangle().fill(Color.line).frame(height: 0.5).padding(.leading, 70).padding(.trailing, 22)
     }
     @ViewBuilder var accountView: some View {
         switch page {
@@ -325,10 +345,12 @@ extension Market {
                 .address,
                 shop.memory.address.street.isEmpty ? "Не указан" : shop.memory.address.street
             ).clipShape(RoundedRectangle(cornerRadius: 22))
-            VStack(spacing: 1) { accountRow("Мои заказы", "receipt", .orders)
+            VStack(spacing: 0) { accountRow("Мои заказы", "receipt", .orders)
+                accountDivider
                 accountRow("Настройки", "gear", .settings)
+                accountDivider
                 accountRow("О сервисе", "info", .about)
-            }.clipShape(RoundedRectangle(cornerRadius: 22))
+            }.padding(.vertical, 6).tile(.surface, 22)
             if shop.memory.signedIn != nil {
                 Button("Выйти из аккаунта") {
                     shop.memory.signedIn = nil
@@ -343,7 +365,11 @@ extension Market {
                 Text("Версия 1.0").font(type(13)).foregroundStyle(Color.muted)
             }.opacity(0.65).frame(maxWidth: .infinity)
         case .settings: header("Настройки")
-            Toggle("Тёмная тема", isOn: $dark).padding().tile().tint(.accentBlue)
+            Toggle(isOn: $dark) {
+                HStack(spacing: 18) { Glyph("moon", 25).frame(width: 30)
+                    Text("Тёмная тема").font(type(17, 500))
+                }
+            }.padding(.horizontal, 22).frame(height: 86).tile(.surface, 22).tint(.accentBlue)
         case .about:
             header("О сервисе")
             VStack(alignment: .leading, spacing: 14) {
