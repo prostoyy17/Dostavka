@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795256577';
+const BUILD = '1795726045';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -268,6 +268,9 @@ const FILTERS = [['photo', 'Только с фото'], ['kg', 'Весовые �
 const caret = svgI('down', 13);
 const icoFilter = svgI('filter', 16, 'pill__ico');
 const icoSort = svgI('sort', 16, 'pill__ico');
+function filterIndicator(count) {
+  return count ? `<b class="pill__n">${count}</b>` : caret;
+}
 function renderControls() {
   const box = $('#controls');
   if (!box) return;
@@ -288,7 +291,7 @@ function renderControls() {
     }
     sub = `<div class="dd"><button class="pill ${state.sub ? 'on' : ''}" data-dd="sub"><span class="pill__label">${state.sub ? esc(state.sub) : 'Подраздел'}</span>${state.sub ? '<i class="pill__x" data-sub="" title="Сбросить">×</i>' : caret}</button>${menu}</div>`;
   }
-  const flt = `<div class="dd"><button class="pill ${nF ? 'on' : ''}" data-dd="flt">${icoFilter}<span class="pill__label">Фильтры</span>${nF ? `<b class="pill__n">${nF}</b>` : caret}</button>${state.dd === 'flt' ? `<div class="dd__menu">${head('Фильтры')}<div class="dd__scroll">${FILTERS.map(([f, l]) => `<button class="dd__opt ${state.filters.has(f) ? 'sel' : ''}" data-filter="${f}"><span>${l}</span><i class="dd__box"></i></button>`).join('')}</div></div>` : ''}</div>`;
+  const flt = `<div class="dd"><button class="pill ${nF ? 'on' : ''}" data-dd="flt">${icoFilter}<span class="pill__label">Фильтры</span>${filterIndicator(nF)}</button>${state.dd === 'flt' ? `<div class="dd__menu">${head('Фильтры')}<div class="dd__scroll">${FILTERS.map(([f, l]) => `<button class="dd__opt ${state.filters.has(f) ? 'sel' : ''}" data-filter="${f}" aria-pressed="${state.filters.has(f)}"><span>${l}</span><i class="dd__box"></i></button>`).join('')}</div></div>` : ''}</div>`;
   const sortName = (SORTS.find(s => s[0] === state.sort) || SORTS[0])[2];
   const srt = `<div class="dd dd--right"><button class="pill" data-dd="sort">${icoSort}<span class="pill__label">${sortName}</span>${caret}</button>${state.dd === 'sort' ? `<div class="dd__menu">${head('Сортировка')}<div class="dd__scroll">${SORTS.map(([v, l]) => `<button class="dd__opt ${state.sort === v ? 'sel' : ''}" data-sort="${v}"><span>${l}</span></button>`).join('')}</div></div>` : ''}</div>`;
   box.innerHTML = (state.dd ? '<div class="dd__back" data-dd-close></div>' : '') + sub + flt + srt;
@@ -1442,7 +1445,13 @@ document.addEventListener('click', e => {
     const f = x.dataset.filter;
     state.filters.has(f) ? state.filters.delete(f) : state.filters.add(f);
     state.limit = 60;
-    renderControls(); return renderCatalog();
+    const selected = state.filters.has(f);
+    x.classList.toggle('sel', selected);
+    x.setAttribute('aria-pressed', String(selected));
+    const trigger = $('#controls [data-dd="flt"]');
+    trigger.classList.toggle('on', state.filters.size > 0);
+    trigger.lastElementChild.outerHTML = filterIndicator(state.filters.size);
+    return renderCatalog();
   }
   if ((x = el('[data-sub]'))) {
     state.sub = x.dataset.sub || null; state.limit = 60; state.dd = null;
