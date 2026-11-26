@@ -32,6 +32,7 @@ struct Receipt: Codable, Identifiable {
 struct Account: Codable { var name, phone, salt, hash: String }
 struct Memory: Codable {
     var favorites: [Int] = [], cart: [Int: Double] = [:], address = Address(), orders: [Receipt] = []
+    var searchHistory: [String: [String]]?
     var accounts: [Account] = [], signedIn: String?, store: Int?
 }
 func rub(_ value: Double) -> String {

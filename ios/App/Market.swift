@@ -8,7 +8,7 @@ import SwiftUI
         }
     }
 }
-enum Page: String { case catalog, search, favorites, cart, account, address, settings, about, orders, login, checkout }
+enum Page: String { case catalog, search, searchResults, favorites, cart, account, address, settings, about, orders, login, checkout }
 enum Panel: Equatable { case stores, product(Int), filters, sort, subs, receipt(String) }
 struct UndoNotice: Identifiable {
     let id = UUID()
@@ -33,6 +33,7 @@ struct Market: View {
     @State var draftStore: Int?
     @State var category = "all"
     @State var query = ""
+    @State var suggestions = SearchSuggestions()
     @State var sub = ""
     @State var order = "Популярные"
     @State var photoOnly = false
@@ -58,6 +59,7 @@ struct Market: View {
         order = "Популярные"
         photoOnly = false
         kgOnly = false
+        suggestions = SearchSuggestions()
         go(.search)
         rows = []
     }
@@ -85,6 +87,11 @@ struct Market: View {
         page = p
     }
     func back() {
+        if page == .searchResults {
+            page = path.popLast() ?? .search
+            panel = nil
+            return
+        }
         if page == .search, let saved = browseSelection {
             query = ""
             category = saved.category
@@ -116,6 +123,7 @@ struct Market: View {
                         path = [.account]
                         panel = .receipt(id)
                     }
+                case .search, .searchResults: searchScreen
                 case .address: AddressPage(shop: shop, back: back)
                 case .login: LoginPage(shop: shop, back: back)
                 default:
@@ -126,7 +134,6 @@ struct Market: View {
                             }
                             switch page {
                             case .catalog: catalogView
-                            case .search: searchView
                             case .favorites: favoritesView
                             case .cart: cartView
                             case .account, .settings, .about, .orders: accountView
@@ -194,7 +201,7 @@ struct Market: View {
                 updateScope()
             }
             .onChange(of: query) { _, _ in
-                if page == .search { filter() }
+                if page == .search { suggestions = SearchSuggestions() }
             }
     }
     var backButton: some View {
@@ -215,8 +222,10 @@ struct Market: View {
             ).padding(.bottom, 10)
     }
     func tab(_ target: Page, _ title: String, _ icon: String, _ badge: Int) -> some View {
-        let active = page == target || (target == .account && [.about, .settings, .orders, .address].contains(page))
-        return Button { page = target
+        let active = page == target || (target == .catalog && page == .searchResults) || (target == .account && [.about, .settings, .orders, .address].contains(page))
+        return Button {
+            if page == .searchResults { back(); back() }
+            page = target
             path = []
             panel = nil
         } label: {
@@ -332,22 +341,6 @@ struct Market: View {
             header(!query.isEmpty ? "Поиск «\(query)»" : shop.departments[category]?.name ?? selectedName)
             resultsView
         }
-    }
-    @ViewBuilder var searchView: some View {
-        HStack(spacing: 8) {
-            backButton
-            HStack(spacing: 8) {
-                Glyph("search", 20).foregroundStyle(Color.muted)
-                TextField("Найти товар", text: $query).focused($searching).submitLabel(.search)
-                    .onSubmit { searching = false }
-                if !query.isEmpty {
-                    Button { query = ""; searching = true } label: { Glyph("x", 16).frame(width: 32, height: 40) }
-                        .accessibilityLabel("Очистить поиск")
-                }
-            }.padding(.horizontal, 12).frame(height: 48).tile()
-        }.onAppear { searching = true }
-        Text("Поиск · " + selectedName).font(type(14, 600)).foregroundStyle(Color.muted)
-        if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { resultsView }
     }
     @ViewBuilder var resultsView: some View {
         if !rows.isEmpty || photoOnly || kgOnly || !sub.isEmpty {
