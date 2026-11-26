@@ -1,4 +1,6 @@
 set -euo pipefail
+swiftc -O App/CatalogTypes.swift App/CatalogSearch.swift Tests/SearchRegression.swift -o "$RUNNER_TEMP/mayr-check-search"
+"$RUNNER_TEMP/mayr-check-search"
 device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; ds=json.load(sys.stdin)["devices"]["com.apple.CoreSimulator.SimRuntime.iOS-27-2"]; print(next(d["udid"] for d in ds if d["name"]=="iPhone 18 Pro"))')
 xcrun simctl boot "$device"
 build=(-project MayrMarket.xcodeproj -scheme MayrMarket -destination "id=$device" -derivedDataPath build -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO)

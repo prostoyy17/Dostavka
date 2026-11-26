@@ -1,43 +1,5 @@
 import SwiftUI
 
-struct SearchSuggestions {
-    var additions: [String] = []
-    var categories: [String] = []
-
-    init() {}
-
-    init(term: String, items: [Item], index: [Int: String]) {
-        let words = term.lowercased().replacingOccurrences(of: "ё", with: "е").split(whereSeparator: { $0.isWhitespace })
-        guard !words.isEmpty else { return }
-        var parts: [String: Int] = [:]
-        var groups: [String: Int] = [:]
-        let skip: Set<String> = ["для", "из", "со", "на", "шт", "гр", "кг", "мл", "от", "по"]
-        var sampled = 0
-        for item in items {
-            guard let text = index[item.id], words.allSatisfy({ text.contains($0) }) else { continue }
-            groups[item.cat, default: 0] += 1
-            guard sampled < 350 else { continue }
-            sampled += 1
-            let tokens = item.name.lowercased().replacingOccurrences(of: "ё", with: "е")
-                .split(whereSeparator: { $0.isWhitespace })
-            var seen = Set<String>()
-            for token in tokens {
-                let value = String(token.trimmingCharacters(in: .punctuationCharacters.subtracting(CharacterSet(charactersIn: "%"))))
-                guard value.count > 1 || value.first?.isNumber == true,
-                      value.contains(where: { $0.isLetter || $0.isNumber }),
-                      !skip.contains(value), !words.contains(where: { value.contains($0) }),
-                      seen.insert(value).inserted else { continue }
-                parts[value, default: 0] += 1
-            }
-        }
-        func ranked(_ counts: [String: Int], limit: Int) -> [String] {
-            counts.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }.prefix(limit).map(\.key)
-        }
-        additions = ranked(parts, limit: 5)
-        categories = ranked(groups, limit: 5)
-    }
-}
-
 extension Market {
     private var term: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var historyKey: String { shop.memory.store.map(String.init) ?? "all" }
@@ -59,8 +21,9 @@ extension Market {
         order = "Популярные"
         kgOnly = false
         photoOnly = false
+        resolvedTerm = nil
         go(.searchResults)
-        filter()
+        rows = []
     }
 
     var searchScreen: some View {
@@ -96,22 +59,29 @@ extension Market {
                     }.accessibilityLabel("Изменить запрос")
                 }
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) { resultsView }
+                    VStack(alignment: .leading, spacing: 12) {
+                        if resolvedTerm == query { resultsView } else { ProgressView().accessibilityLabel("Идёт поиск") }
+                    }
                         .padding(.bottom, 100)
                 }
             }
         }.padding(.horizontal, 16).padding(.top, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .task(id: page) { if page == .search { searching = true } }
-            .task(id: SearchInput(page: page, query: query, digest: shop.digest)) {
-                guard page == .search, !term.isEmpty else { return }
-                try? await Task.sleep(for: .milliseconds(100))
-                guard !Task.isCancelled else { return }
-                suggestions = SearchSuggestions(term: term, items: shop.catalog.items, index: searchTextByID)
+            .task(id: SearchInput(page: page, query: query, scope: currentScope)) {
+                let requested = query, currentPage = page, key = currentScope
+                guard !term.isEmpty else { return }
+                if currentPage == .search { try? await Task.sleep(for: .milliseconds(80)) }
+                guard !Task.isCancelled,
+                      let result = try? await searchEngine.lookup(requested, scope: key, catalog: shop.catalog),
+                      !Task.isCancelled, query == requested, page == currentPage, currentScope == key else { return }
+                suggestions = result
+                resolvedTerm = requested
+                if currentPage == .searchResults { filter() }
             }
     }
 
-    private struct SearchInput: Equatable { let page: Page, query: String, digest: String }
+    private struct SearchInput: Equatable { let page: Page, query: String, scope: SearchScope }
 
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 8) {

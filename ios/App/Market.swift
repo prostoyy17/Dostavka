@@ -44,7 +44,9 @@ struct Market: View {
     @AppStorage("native-dark") var dark = false
     @State var rows: [Item] = []
     @State var categoryRows: [String: [Item]] = [:]
-    @State var searchTextByID: [Int: String] = [:]
+    @State var searchEngine = CatalogSearch()
+    @State var resolvedTerm: String?
+    var currentScope: SearchScope { SearchScope(digest: shop.digest, store: shop.memory.store) }
     @State var scopeSubs: [String: Set<String>] = [:]
     struct BrowseSelection {
         let category: String, sub: String, order: String
@@ -65,13 +67,9 @@ struct Market: View {
     }
     func updateScope() {
         var groups: [String: Set<String>] = [:]
-        var terms: [Int: String] = [:]
         for item in shop.catalog.items where matchesStore(item) {
             groups[item.cat, default: []].insert(item.sub)
-            terms[item.id] = (item.name + " " + item.sub + " " + (shop.departments[item.cat]?.name ?? ""))
-                .lowercased().replacingOccurrences(of: "ё", with: "е")
         }
-        searchTextByID = terms
         scopeSubs = groups
         filter()
     }
@@ -200,8 +198,9 @@ struct Market: View {
                 }
                 updateScope()
             }
+            .task(id: currentScope) { try? await searchEngine.prepare(currentScope, shop.catalog) }
             .onChange(of: query) { _, _ in
-                if page == .search { suggestions = SearchSuggestions() }
+                if page == .search { suggestions = SearchSuggestions(); resolvedTerm = nil }
             }
     }
     var backButton: some View {
@@ -249,17 +248,10 @@ struct Market: View {
         Text(title).font(type(30, 800)).tracking(-1)
     }
     func filter() {
-        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        if page == .search && term.isEmpty {
-            rows = []
-            return
-        }
-        let words = term.lowercased().replacingOccurrences(of: "ё", with: "е").split(whereSeparator: { $0.isWhitespace })
-        var list = shop.catalog.items.filter { p in
-            guard matchesStore(p), (category == "all" || p.cat == category), sub.isEmpty || sub == p.sub, !photoOnly || !p.photo.isEmpty, !kgOnly || p.kg else { return false }
-            if words.isEmpty { return true }
-            guard let searchable = searchTextByID[p.id] else { return false }
-            return words.allSatisfy { searchable.contains($0) }
+        let candidates = page == .searchResults ? suggestions.ids.compactMap { shop.byID[$0] } : shop.catalog.items
+        var list = candidates.filter { p in
+            matchesStore(p) && (category == "all" || p.cat == category) && (sub.isEmpty || sub == p.sub)
+                && (!photoOnly || !p.photo.isEmpty) && (!kgOnly || p.kg)
         }
         switch order { case "Сначала дешевле": list.sort {
                 $0.price < $1.price
@@ -270,11 +262,11 @@ struct Market: View {
         case "По названию": list.sort {
                 $0.name.localizedCompare($1.name) == .orderedAscending
             }
-        default: list = list.filter {
+        default: if page != .searchResults { list = list.filter {
                 !$0.photo.isEmpty
             } + list.filter {
                 $0.photo.isEmpty
-            }}
+            } } }
         rows = list
         limit = 60
     }
