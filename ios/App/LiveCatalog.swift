@@ -34,7 +34,7 @@ enum LiveCatalog {
         let departments = try JSONDecoder().decode([Department].self, from: JSONSerialization.data(withJSONObject: cats))
         var categories: [String: Department] = [:]
         for d in departments {
-            categories[d.id] = d
+            guard categories.updateValue(d, forKey: d.id) == nil else { throw URLError(.cannotParseResponse) }
         }
         var replacements: [String: String] = [:]
         let photoText = String(decoding: photos, as: UTF8.self)

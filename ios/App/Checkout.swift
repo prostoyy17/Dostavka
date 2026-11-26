@@ -450,7 +450,7 @@ struct Checkout: View {
         let products = lines.map {
             "\($0.item.name) · \(shop.storeName($0.item)) · \(amount($0.quantity, $0.item.kg)) × \(rub($0.item.price)) = \(rub(Double($0.sum)))"
         }.joined(separator: "\n")
-        let message = "Заказ №\(id)\n\(a.name)\n\(a.phone)\n\(details)\nВремя: \(delivery)\nОплата: \(pay) \(pay == "Наличными" ? change : "")\nНет товара: \(replacement)\n\(products)\nДоставка: \(rub(Double(shop.fee)))\nИтого: \(rub(Double(shop.total)))"
+        let message = "🛒 *ЗАКАЗ №\(id)*\n\(a.name)\n\(a.phone)\n\(details)\nВремя: \(delivery)\nОплата: \(pay) \(pay == "Наличными" ? change : "")\nНет товара: \(replacement)\n\(products)\nДоставка: \(rub(Double(shop.fee)))\nИтого: \(rub(Double(shop.total)))"
         do {
             try await transmitOrder(receipt, message: message, photos: a.photos)
             var next = shop.memory

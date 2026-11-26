@@ -18,7 +18,7 @@ import json, pathlib, shutil, re
 root=pathlib.Path('attachments')
 for section in json.loads((root/'manifest.json').read_text()):
     for a in section['attachments']:
-        m=re.search(r'(?:0[1-9]|1[01])-[a-z]+',a['suggestedHumanReadableName'])
+        m=re.search(r'(?:0[1-9]|1[0-3])-[a-z]+',a['suggestedHumanReadableName'])
         if m: shutil.copyfile(root/a['exportedFileName'],'output/'+m.group()+'.png')
-assert len(list(pathlib.Path('output').glob('*.png')))==11
+assert len(list(pathlib.Path('output').glob('*.png')))==13
 PY

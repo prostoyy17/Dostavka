@@ -43,7 +43,7 @@ struct Market: View {
     @AppStorage("native-dark") var dark = false
     @State var rows: [Item] = []
     @State var categoryRows: [String: [Item]] = [:]
-    @State var scopeCategories: Set<String> = []
+    @State var searchTextByID: [Int: String] = [:]
     @State var scopeSubs: [String: Set<String>] = [:]
     struct BrowseSelection {
         let category: String, sub: String, order: String
@@ -59,13 +59,17 @@ struct Market: View {
         photoOnly = false
         kgOnly = false
         go(.search)
+        rows = []
     }
     func updateScope() {
         var groups: [String: Set<String>] = [:]
+        var terms: [Int: String] = [:]
         for item in shop.catalog.items where matchesStore(item) {
             groups[item.cat, default: []].insert(item.sub)
+            terms[item.id] = (item.name + " " + item.sub + " " + (shop.departments[item.cat]?.name ?? ""))
+                .lowercased().replacingOccurrences(of: "ё", with: "е")
         }
-        scopeCategories = Set(groups.keys)
+        searchTextByID = terms
         scopeSubs = groups
         filter()
     }
@@ -241,17 +245,12 @@ struct Market: View {
             rows = []
             return
         }
-        let words = term.lowercased().replacingOccurrences(of: "ё", with: "е").split(separator: " ")
+        let words = term.lowercased().replacingOccurrences(of: "ё", with: "е").split(whereSeparator: { $0.isWhitespace })
         var list = shop.catalog.items.filter { p in
             guard matchesStore(p), (category == "all" || p.cat == category), sub.isEmpty || sub == p.sub, !photoOnly || !p.photo.isEmpty, !kgOnly || p.kg else { return false }
             if words.isEmpty { return true }
-            let hay = (p.name + " " + p.sub + " " + (shop.departments[p.cat]?.name ?? "")).lowercased().replacingOccurrences(
-                of: "ё",
-                with: "е"
-            )
-            return words.allSatisfy {
-                    hay.contains($0)
-                }
+            guard let searchable = searchTextByID[p.id] else { return false }
+            return words.allSatisfy { searchable.contains($0) }
         }
         switch order { case "Сначала дешевле": list.sort {
                 $0.price < $1.price
@@ -289,7 +288,7 @@ struct Market: View {
             }.accessibilityIdentifier("stores")
             Button { go(.address) } label: {
                 HStack(spacing: 6) {
-                    Circle().fill(.green).frame(width: 8, height: 8)
+                    Circle().fill(openAt(Date()) ? Color.green : Color.muted).frame(width: 8, height: 8)
                     Text(shop.memory.address.street.isEmpty ? "Указать адрес" : shop.memory.address.street)
                         .lineLimit(1).truncationMode(.tail)
                     Text("· 60–90 мин").fixedSize()
@@ -305,7 +304,7 @@ struct Market: View {
         }.accessibilityIdentifier("open-search")
         ScrollView(.horizontal) { HStack(alignment: .top, spacing: 8) {
             circle("all", "Все товары", "cart", "ffffff")
-            ForEach(shop.catalog.categories.filter { scopeCategories.contains($0.id) }) { c in
+            ForEach(shop.catalog.categories.filter { scopeSubs[$0.id] != nil }) { c in
                 circle(c.id, c.name, c.icon, c.color)
             }
         }}.scrollIndicators(.hidden)
@@ -477,7 +476,7 @@ struct Market: View {
                 if full && q == 0 {
                     Text("В корзину").font(type(15, 700))
                 }
-            }.padding(.horizontal, full ? 8 : 0).frame(minWidth: full ? 46 : (q == 0 ? 42 : 32), minHeight: 44)
+            }.frame(maxWidth: full && q == 0 ? .infinity : nil).padding(.horizontal, full ? 8 : 0).frame(minWidth: full ? 46 : (q == 0 ? 42 : 32), minHeight: 44)
                 .background(full && q > 0 ? Color.white.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 10)).contentShape(Rectangle()) }
                 .opacity(q >= shop.available(p) ? 0.45 : 1).disabled(q >= shop.available(p)).accessibilityIdentifier("add-\(p.id)").accessibilityLabel(q == 0 ? "В корзину" : "Больше")
         }.padding(.horizontal, full ? 4 : 0).frame(maxWidth: full ? .infinity : nil, minHeight: full ? 48 : 42).foregroundStyle(.white).background(
