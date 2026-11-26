@@ -56,7 +56,7 @@ func phoneDigits(_ s: String) -> String {
     }
     let file = URL.documentsDirectory.appending(path: "native-market.json")
     var recs: [Item]
-    var digest = "6d1aec44d063cc6df20617735a46e8b2ec1b53c5647e1eb48bccb80742f6be44"
+    var digest = "dd1fbe7fadd0dc7b5980c9820f423022343b140a5e350e529885d81382ce165e"
     init() {
         for w in [400, 500, 600, 700, 800] {
             if let u = Bundle.main.url(forResource: "Onest\(w)", withExtension: "ttf") {
