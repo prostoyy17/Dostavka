@@ -520,8 +520,9 @@ struct Checkout: View {
         append("\r\n")
     }
     append("--\(boundary)--\r\n")
-    var request = URLRequest(url: URL(string: "https://mayrmarket-order-test.zanyburl3.chatgpt.site/orders")!)
+    var request = URLRequest(url: URL(string: "https://mayrmarket-order-test.zanyburl3.chatgpt.site/ios/orders")!)
     request.httpMethod = "POST"
+    request.setValue("ios", forHTTPHeaderField: "X-Mayr-Client")
     request.setValue("multipart/form-data; boundary=" + boundary, forHTTPHeaderField: "Content-Type")
     #if DEBUG && targetEnvironment(simulator)
         if ProcessInfo.processInfo.arguments.contains("-RecordShopping") {
