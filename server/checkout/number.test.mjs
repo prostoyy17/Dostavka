@@ -26,3 +26,27 @@ test('parallel web and iOS reservations retry collisions without reusing numbers
   }));
   assert.equal(new Set(numbers).size,4);
 });
+
+test('shared recommendations accept category totals only and include concurrent updates', async () => {
+  const objects = new Map();
+  const BUCKET = {
+    async get(key) {
+      const value = objects.get(key);
+      return value && {etag: value.etag, json: async () => JSON.parse(value.body)};
+    },
+    async put(key, body, {onlyIf}) {
+      const old = objects.get(key);
+      if (old ? onlyIf.etagMatches !== old.etag : onlyIf.etagDoesNotMatch !== '*') return null;
+      const entry = {body, etag: crypto.randomUUID()};
+      objects.set(key, entry);
+      return entry;
+    }
+  };
+  const headers = {Origin:'https://prostoyy17.github.io'};
+  const call = (body) => worker.fetch(new Request('https://example.org/category-interest',
+    body ? {method:'POST', headers, body:JSON.stringify(body)} : {headers}), {BUCKET});
+  const writes = await Promise.all([call({milk:2}),call({milk:3, veg:1})]);
+  assert.ok(writes.every(r=>r.status===204));
+  assert.equal((await call({query:'сыр'})).status,400);
+  assert.deepEqual(await (await call()).json(),{milk:5,veg:1});
+});
