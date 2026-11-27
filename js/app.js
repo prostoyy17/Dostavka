@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795760204';
+const BUILD = '1795760451';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -322,7 +322,7 @@ function renderCatalog() {
   if (!root) return;
   const list = filtered();
   if (!list.length) {
-    root.innerHTML = `<div class="empty">${iconBox('search', 'empty__tile')}<div class="empty__title">Ничего не найдено</div><button class="btn btn--ghost btn--sm" data-action="reset">Сбросить фильтры</button></div>`;
+    root.innerHTML = `<div class="empty">${iconBox('search', 'empty__tile')}<div class="empty__title">Ничего не найдено</div><button class="btn btn--ghost btn--sm" data-action="reset">${state.route === 'results' && !state.filters.size ? 'Изменить запрос' : 'Сбросить фильтры'}</button></div>`;
     return;
   }
   const grouped = state.cat === 'all' && !state.query && state.store === null;
@@ -1495,7 +1495,13 @@ document.addEventListener('click', e => {
     }
     if (a === 'remove-bad') { cartLines().filter(l => !l.ok).forEach(l => l.avail ? state.cart[l.p.id] = l.avail : delete state.cart[l.p.id]); save(); renderAll(); }
     if (a === 'checkout') openCheckout();
-    if (a === 'reset') { state.filters.clear(); state.sub = null; if (state.route === 'results') { searchDraft = state.query; location.hash = '#/search'; } else goCatalog('all'); }
+    if (a === 'reset') {
+      const hadFilters = state.filters.size > 0;
+      state.filters.clear(); state.sub = null;
+      if (state.route !== 'results') goCatalog('all');
+      else if (hadFilters) renderPage();
+      else { searchDraft = state.query; location.hash = '#/search'; }
+    }
     if (a === 'clear-favs') {
       const backup = [...state.favs];
       state.favs = []; save(); renderPage();
@@ -1586,7 +1592,12 @@ document.addEventListener('click', e => {
   if (btn.id === 'searchInput' || btn.hasAttribute('data-edit-query')) {
     searchDraft = state.query;
     if (state.route === 'results' && history.state?.fromSearch) history.back();
-    else location.hash = '#/search';
+    else {
+      rememberScroll();
+      history.pushState(null, '', '#/search');
+      parseRoute(); closeAll(); renderPage();
+      window.scrollTo(0,0);
+    }
   } else if (btn.hasAttribute('data-cancel-search')) {
     location.hash = '#/';
   } else if (btn.hasAttribute('data-clear-history')) {

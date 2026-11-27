@@ -26,34 +26,39 @@ function createProductSearch(products) {
     const key = JSON.stringify([tokens,store]);
     if (cache.has(key)) return cache.get(key);
     let matches;
+    const matchedTerms = [];
     for (const token of tokens) {
-      const ids = new Set();
-      function collect(typo) {
+      const ids = new Set(), quality = new Map();
+      function collect(term, approximate = false) {
         for (const [word, rows] of index) {
-          if (!(typo ? near(token,word) : word.startsWith(token))) continue;
+          if (!(approximate ? near(term, word) : word.startsWith(term))) continue;
+          quality.set(word, word === term ? 5 : approximate ? 2 : 3);
           for (const p of rows) {
-            if ((!matches || matches.has(p)) && (store === null || p.offers.some(o=>o[0]===store))) ids.add(p);
+            if (matches && !matches.has(p)) continue;
+            if (store !== null && !p.offers.some(o => o[0] === store)) continue;
+            ids.add(p);
           }
         }
       }
-      collect(false);
+      collect(token);
       if (!ids.size && /^[a-z]+$/.test(token)) {
-        const english = "qwertyuiopasdfghjklzxcvbnm";
-        const russian = "йцукенгшщзфывапролдячсмить";
-        const russianToken = [...token].map(c=>russian[english.indexOf(c)]).join('');
-        for (const [word,rows] of index) if (word.startsWith(russianToken)) {
-          for (const p of rows) if ((!matches || matches.has(p)) && (store === null || p.offers.some(o=>o[0]===store))) ids.add(p);
-        }
+        const english = 'qwertyuiopasdfghjklzxcvbnm';
+        const russian = 'йцукенгшщзфывапролдячсмить';
+        collect([...token].map(c => russian[english.indexOf(c)]).join(''));
       }
-      if (!ids.size) collect(true);
+      if (!ids.size) collect(token, true);
       matches = ids;
+      matchedTerms.push(quality);
       if (!ids.size) break;
     }
-    const rows = [...(matches || [])].map(p=>{
-      const name=words.get(p);
-      const score=tokens.reduce((sum,t)=>sum+(name.includes(t)?5:name.some(w=>w.startsWith(t))?3:0),0);
-      return {p, score: score + Number(name[0]===tokens[0])};
-    }).sort((a,b)=>b.score-a.score || b.p.popularity-a.p.popularity).map(row=>row.p);
+    const rows = [...(matches || [])].map(p => {
+      const name = words.get(p);
+      const score = matchedTerms.reduce((sum, quality) => {
+        const best = name.reduce((n, w) => Math.max(n, quality.get(w) || 0), 0);
+        return sum + best + Number(quality.has(name[0]));
+      }, 0);
+      return {p, score};
+    }).sort((a,b) => b.score - a.score || b.p.popularity - a.p.popularity).map(row => row.p);
     const counts = new Map();
     for (const p of rows.slice(0,160)) {
       for (const word of new Set(words.get(p))) {
