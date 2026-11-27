@@ -32,10 +32,53 @@ function withinLimit(ip) {
   recent.set(ip, bucket);
   return true;
 }
+// Aggregate category activity into a weekly object. Never store visitor identifiers or query strings.
+const categories = new Set('veg milk meat bread ready frozen grocery canned tea drinks sweets snacks healthy baby chem care home office pets islam other'.split(' '));
+const weekMs = 7 * 86400000;
+async function community(req, env) {
+  const origin = req.headers.get('Origin');
+  if (origin !== 'https://prostoyy17.github.io') return new Response(null, {status:403});
+  const headers = {'Access-Control-Allow-Origin':origin, 'Vary':'Origin'};
+  const week = Math.floor(Date.now() / weekMs);
+  const key = w => 'category-interest/week-' + w;
+  if (req.method === 'GET') {
+    const scores = {};
+    for (const [i, obj] of (await Promise.all([week, week-1].map(w=>env.BUCKET.get(key(w))))).entries()) {
+      if (!obj) continue;
+      for (const [cat, count] of Object.entries(await obj.json())) scores[cat] = (scores[cat] || 0) + count / (i+1);
+    }
+    return Response.json(scores, {headers:{...headers,'Cache-Control':'public, max-age=300'}});
+  }
+  if (req.method !== 'POST') return new Response(null, {status:405,headers});
+  if (!withinLimit('interest:' + (req.headers.get('CF-Connecting-IP') || 'unknown'))) return new Response(null, {status:429,headers});
+  if (Number(req.headers.get('content-length')) > 512) return new Response(null, {status:413,headers});
+  const reader=req.body?.getReader();
+  if (!reader) return new Response(null,{status:400,headers});
+  const decoder=new TextDecoder();
+  let body='',size=0;
+  for (;;) {
+    const part=await reader.read(); if(part.done) break;
+    size+=part.value.length;
+    if(size>512) { await reader.cancel(); return new Response(null,{status:413,headers}); }
+    body+=decoder.decode(part.value,{stream:true});
+  }
+  let updates;
+  try { updates=Object.entries(JSON.parse(body+decoder.decode())); } catch { return new Response(null,{status:400,headers}); }
+  if (!updates.length || updates.some(([c,n])=>!categories.has(c)||!Number.isInteger(n)||n<1||n>12)) return new Response(null,{status:400,headers});
+  for(let attempt=0;attempt<4;attempt++) {
+    const old=await env.BUCKET.get(key(week)), counts=old ? await old.json() : {};
+    for(const [c,n] of updates) counts[c]=(counts[c]||0)+n;
+    const saved=await env.BUCKET.put(key(week),JSON.stringify(counts),{onlyIf:old ? {etagMatches:old.etag} : {etagDoesNotMatch:'*'}});
+    if(saved) return new Response(null,{status:204,headers});
+  }
+  return new Response(null,{status:503,headers});
+}
+
 export default {
  async fetch(req,env) {
   const entered=Date.now();
   const url=new URL(req.url);
+  if (url.pathname === "/category-interest") return community(req, env);
   const reserve = ['/order-number', '/ios/order-number'].includes(url.pathname);
   const native = ['/ios/orders', '/ios/order-number'].includes(url.pathname);
   if(reserve || native || url.pathname === '/orders') {
