@@ -1,14 +1,16 @@
 import SwiftUI
 
-struct LaunchIntro<Content: View>: View {
-    @ViewBuilder let content: () -> Content
+struct LaunchIntro: View {
+    @State private var shop: Shop?
+    @State private var failed = false
+    @State private var attempt = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showing = true
     @State private var unfolded = false
 
     var body: some View {
         ZStack {
-            content().accessibilityHidden(showing)
+            if let shop { Market(shop: shop).accessibilityHidden(showing) }
             if showing {
                 ZStack {
                     LinearGradient(colors: [Color(hex: "001746"), Color(hex: "073BC2")],
@@ -24,18 +26,30 @@ struct LaunchIntro<Content: View>: View {
                         Image("LaunchMark").resizable().frame(width: 76, height: 76)
                             .clipShape(RoundedRectangle(cornerRadius: 22))
                             .shadow(color: .black.opacity(0.2), radius: 18, y: 8)
-                        Text("MayrMarket").font(type(28, 800)).foregroundStyle(.white)
+                        Text("MayrMarket").font(.system(size: 28, weight: .heavy, design: .rounded)).foregroundStyle(.white)
+                        if failed {
+                            Text("Не удалось открыть каталог").foregroundStyle(.white)
+                            Button("Повторить") { attempt += 1 }.buttonStyle(.borderedProminent)
+                        }
                     }.scaleEffect(unfolded || reduceMotion ? 1 : 0.90)
-                }.accessibilityLabel("MayrMarket").transition(.opacity)
+                }.transition(.opacity)
             }
-        }.task {
+        }.task(id: attempt) {
             guard showing else { return }
+            failed = false
+            let loading = Task.detached(priority: .userInitiated) { try Shop.startupCatalog() }
+            // Present the initial frame before unfolding the rings.
+            try? await Task.sleep(for: .milliseconds(90))
             if !reduceMotion {
-                withAnimation(.easeOut(duration: 1.05)) { unfolded = true }
+                withAnimation(.easeInOut(duration: 1.1)) { unfolded = true }
             }
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 180 : 1100))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.22)) { showing = false }
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 100 : 1250))
+            do {
+                let snapshot = try await loading.value
+                guard !Task.isCancelled else { return }
+                shop = Shop(snapshot: snapshot)
+                withAnimation(.easeOut(duration: 0.28)) { showing = false }
+            } catch { failed = true }
         }
     }
 }

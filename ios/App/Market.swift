@@ -1,10 +1,9 @@
 import SwiftUI
 
 @main struct MayrMarket: App {
-    @State private var shop = Shop()
     var body: some Scene {
         WindowGroup {
-            LaunchIntro { Market(shop: shop) }.environment(\.locale, Locale(identifier: "ru_RU")).environment(\.timeZone, cityZone)
+            LaunchIntro().environment(\.locale, Locale(identifier: "ru_RU")).environment(\.timeZone, cityZone)
         }
     }
 }
