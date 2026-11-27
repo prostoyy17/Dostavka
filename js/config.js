@@ -33,5 +33,5 @@ const PRODUCTS = (() => {
       stock: { grz: qty }, popularity: N - rank, offers,
       search: (name + ' ' + c.name + ' ' + (subName || '')).toLowerCase().replace(/ё/g, 'е')
     };
-  });
+  }).filter(p => p.img);
 })();

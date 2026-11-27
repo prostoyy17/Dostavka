@@ -1,0 +1,28 @@
+name: Native iPhone simulator preview
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/ios-preview.yml']
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate the Xcode project
+        working-directory: ios
+        run: |
+          command -v xcodegen || brew install xcodegen
+          xcodegen generate
+      - name: Boot iPhone, build and record real UI test
+        working-directory: ios
+        run: bash record.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MayrMarket-iPhone
+          path: ios/output/
+          if-no-files-found: error

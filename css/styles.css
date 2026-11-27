@@ -957,3 +957,29 @@ body.sticky-header .layout { padding-top: 16px; }
 .store-option i { width: 18px; height: 18px; border: 1.5px solid var(--line); border-radius: 50%; }
 .store-option[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .store-option[aria-pressed="true"] i { border: 5px solid var(--accent); background: white; }
+
+/* Search entry, query editor, and results use the catalog's native spacing. */
+#searchInput { text-align: left; height: 100%; flex: 1; color: var(--text-3); background: transparent; font: inherit; }
+.query-bar { display: flex; align-items: center; gap: 10px; margin: 12px 0 18px; }
+.query-field, .query-edit { flex: 1; min-width: 0; background: var(--surface); border-radius: 15px; height: 48px; }
+.query-edit { justify-content: flex-start; overflow: hidden; }
+.query-cancel, .query-heading button { color: var(--accent); background: transparent; }
+.query-heading { display: flex; align-items: center; justify-content: space-between; font-size: 17px; margin: 18px 0 10px; }
+.query-chips { display: flex; gap: 8px; overflow-x: auto; }
+.query-chips button { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); color: inherit; padding: 10px 14px; border-radius: 16px; white-space: nowrap; }
+.query-chips img { width: 28px; height: 28px; object-fit: contain; }
+.query-list { margin-top: 12px; background: var(--surface); border-radius: 18px; padding: 0 14px; }
+.query-list button { display: block; width: 100%; text-align: left; min-height: 46px; background: transparent; color: inherit; }
+.query-list button + button { border-top: 1px solid var(--line); }
+@media (display-mode: standalone) {
+  .launch-brand { position: fixed; inset: 0; z-index: 9999; pointer-events: none; display: grid; align-content: center; justify-items: center; gap: 14px; overflow: hidden; color: white; font-size: 28px; background: linear-gradient(145deg,#001746,#073bc2); animation: brand-fade 1.2s both; }
+  .launch-brand::before, .launch-brand::after { content: ''; position: absolute; left: 50%; top: 50%; width: 160px; height: 160px; border: 1px solid #ffffff40; border-radius: 42px; animation: brand-ring 1.1s ease-out both; }
+  .launch-brand::after { animation-delay: .12s; }
+  .launch-brand img { width: 76px; border-radius: 22px; }
+}
+@keyframes brand-fade { 0%,75% {opacity: 1} 100% {opacity: 0} }
+@keyframes brand-ring { from {transform: translate(-50%,-50%) rotate(-15deg) scale(.8)} to {transform: translate(-50%,-50%) rotate(19deg) scale(3.8);opacity: 0} }
+@media (prefers-reduced-motion: reduce) { .launch-brand { display: none; } }
+.loc__title { background: transparent; color: inherit; padding: 0; }
+.loc__title small { font-size: 12px; color: var(--accent); }
+.pm__buy .stepper button { min-width: 44px; min-height: 44px; border-radius: 12px; background: rgb(255 255 255 / .15); }

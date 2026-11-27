@@ -2,7 +2,7 @@
 // Данные: data/catalog.js (товары), js/config.js (доставка), js/icons.js (иконки).
 (() => {
 'use strict';
-const BUILD = '1795726045';
+const BUILD = '1795759988';
 if (window.APP_BUILD !== BUILD || !document.getElementById('page')) {
   const u = new URL(location.href);
   if (u.searchParams.get('b') !== BUILD) { u.searchParams.set('b', BUILD); location.replace(u.toString()); }
@@ -14,6 +14,10 @@ const LS = {
   get(k, d) { try { const v = localStorage.getItem('s95_' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem('s95_' + k, JSON.stringify(v)); } catch {} }
 };
+const recommendations = createRecommendations(LS);
+let searchIndex;
+const lookup = term => (searchIndex ||= createProductSearch(PRODUCTS)).lookup(term, state.store);
+let searchDraft = "";
 const state = {
   point: LS.get('point', null),
   mode: LS.get('mode', 'delivery'),
@@ -120,6 +124,7 @@ function setQty(id, qty) {
   const prev = state.cart[id] || 0;
   qty = Math.max(0, qty >= max ? max : Math.min(stepQty(p, qty), max));
   if (qty === prev && qty >= max && qty > 0) { toast('Больше нет в наличии'); return; }
+  if (qty > prev) recommendations.learn(p.cat, 3);
   if (qty === 0) delete state.cart[id]; else state.cart[id] = qty;
   save();
   refreshQty(id);
@@ -179,12 +184,12 @@ function syncFav(id) {
 /* ================= Router ================= */
 function parseRoute() {
   const h = location.hash.replace(/^#\/?/, '');
-  state.route = ['favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart', 'login', 'checkout', 'z/'].find(r => h.startsWith(r)) || 'catalog';
+  state.route = ['results', 'search', 'favorites', 'orders', 'account', 'address', 'about', 'settings', 'cart', 'login', 'checkout', 'z/'].find(r => h.startsWith(r)) || 'catalog';
 }
 /* Память прокрутки: у каждого экрана (и у каждого раздела каталога) своя позиция.
    Ушёл с главной в «Избранное» и вернулся — главная открывается там же, где была. */
 const scrollMem = {};
-const pageKey = () => state.route === 'catalog' ? `catalog:${state.store ?? "all"}:${state.cat}:${state.sub || ''}:${state.query || ''}` : state.route;
+const pageKey = () => ['catalog','results'].includes(state.route) ? `catalog:${state.store ?? "all"}:${state.cat}:${state.sub || ''}:${state.query || ''}` : state.route;
 function rememberScroll() {
   scrollMem[pageKey()] = { y: window.scrollY, limit: state.limit, rows: [...document.querySelectorAll('#page .hrow')].map(r => r.scrollLeft) };
 }
@@ -198,13 +203,21 @@ function restoreScroll() {
   apply(); requestAnimationFrame(apply);   // второй раз — после того как браузер разложит страницу
 }
 // hashchange приходит до перерисовки, поэтому позиция старого экрана ещё на месте (работает и для жеста «назад»)
-window.addEventListener('hashchange', () => { rememberScroll(); parseRoute(); closeAll(); renderPage(); restoreScroll(); });
+window.addEventListener('hashchange', () => {
+  const previous = state.route;
+  rememberScroll(); parseRoute(); closeAll();
+  if (previous === 'search' && state.route === 'results') history.replaceState({fromSearch:true}, '');
+  if (state.route === 'catalog' && previous !== 'catalog') recommendations.refresh();
+  renderPage(); restoreScroll();
+});
 
 function renderPage() {
-  const navOf = { address: 'account', about: 'account', settings: 'account', orders: 'account', login: 'account', checkout: 'cart' };
+  if (state.route === 'results') state.query = new URLSearchParams(location.hash.split('?')[1]).get('q') || '';
+  else state.query = '';
+  const navOf = { search:'catalog', results:'catalog', address: 'account', about: 'account', settings: 'account', orders: 'account', login: 'account', checkout: 'cart' };
   $$('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (navOf[state.route] || state.route)));
   document.body.classList.toggle('sub', state.route !== 'catalog');
-  document.body.classList.toggle('no-tabbar', state.route === 'login' || state.route === 'checkout' || state.route === 'z/');
+  document.body.classList.toggle('no-tabbar', state.route === 'search' || state.route === 'login' || state.route === 'checkout' || state.route === 'z/');
   renderCats();
   if (state.route === 'favorites') { renderFavorites(); return addGap(); }
   if (state.route === 'orders') { renderOrders(); return addBack(); }
@@ -216,22 +229,28 @@ function renderPage() {
   if (state.route === 'checkout') return openCheckout();
   if (state.route === 'z/') return renderOrderView();
   if (state.route === 'login') { renderAuth(); return addBack(); }
+  if (state.route === 'search') return renderSearch();
   renderCatalogPage();
 }
 
 /* ================= Catalog page ================= */
 function filtered() {
-  const words = state.query.toLowerCase().replace(/ё/g, 'е').split(/\s+/).filter(Boolean);
-  const list = PRODUCTS.filter(p => {
+  const searching = state.route === 'results';
+  const pool = searching ? lookup(state.query).rows : PRODUCTS;
+  const list = pool.filter(p => {
     if (state.store !== null && !p.offers.some(offer => offer[0] === state.store)) return false;
     if (state.cat !== 'all' && p.cat !== state.cat) return false;
     if (state.sub && p.sub !== state.sub) return false;
-    if (words.length && !words.every(w => p.search.includes(w))) return false;
-    if (state.filters.has('photo') && !p.img) return false;
     if (state.filters.has('kg') && !p.kg) return false;
     return true;
   });
-  return sortList(list, state.sort);
+  if (!searching && state.sort === 'pop' && (state.store !== null || state.cat !== 'all')) {
+    const key = 'browse:' + [state.store, state.cat, state.sub, ...state.filters].join(':');
+    const featured = recommendations.pick(key, list.filter(p => stockOf(p) > 0), 12);
+    const first = new Set(featured);
+    return [...featured, ...sortList(list.filter(p => !first.has(p)), 'pop')];
+  }
+  return searching && state.sort === "pop" ? list : sortList(list, state.sort);
 }
 function sortList(list, sort) {
   const sorters = {
@@ -253,7 +272,7 @@ function renderCatalogPage() {
   const title = state.query ? `Поиск «${esc(state.query)}»` : state.cat === 'all' ? (STORES[state.store]?.name || 'Все товары') : catById[state.cat].name;
   const home = state.cat === 'all' && !state.query && state.store === null;
   page.innerHTML = `
-    <div class="circles" id="catStrip"></div>
+    ${state.route === 'results' ? `<div class="query-bar"><button class="pill" data-edit-query aria-label="Назад к поиску">${icoBack}</button><button class="search query-edit" data-edit-query>${svgI('search',18)} ${esc(state.query)}</button></div>` : '<div class="circles" id="catStrip"></div>'}
     ${home ? '' : `<div class="toolbar"><h1 class="toolbar__title">${title}</h1></div>
     <div class="controls" id="controls"></div>`}
     <div id="catalog"></div>`;
@@ -264,7 +283,7 @@ function renderCatalogPage() {
 
 /* ---- compact controls: Подраздел · Фильтры · Сортировка ---- */
 const SORTS = [['pop', 'Популярные', 'Популярные'], ['asc', 'Сначала дешевле', 'Дешевле'], ['desc', 'Сначала дороже', 'Дороже'], ['name', 'По названию', 'А–Я']];
-const FILTERS = [['photo', 'Только с фото'], ['kg', 'Весовые товары']];
+const FILTERS = [['kg', 'Весовые товары']];
 const caret = svgI('down', 13);
 const icoFilter = svgI('filter', 16, 'pill__ico');
 const icoSort = svgI('sort', 16, 'pill__ico');
@@ -274,7 +293,7 @@ function filterIndicator(count) {
 function renderControls() {
   const box = $('#controls');
   if (!box) return;
-  const c = state.cat !== 'all' ? catById[state.cat] : null;
+  const c = state.route !== 'results' && state.cat !== 'all' ? catById[state.cat] : null;
   const nF = state.filters.size;
   const head = t => `<div class="dd__head">${t}<button data-dd-close aria-label="Закрыть">${svgI('x', 16)}</button></div>`;
   let sub = '';
@@ -286,7 +305,7 @@ function renderControls() {
       const all = Object.values(cnt).reduce((sum, n) => sum + n, 0);
       menu = `<div class="dd__menu">${head('Подраздел')}<div class="dd__scroll">
         <button class="dd__opt ${!state.sub ? 'sel' : ''}" data-sub=""><span>Все</span><em>${all}</em></button>
-        ${c.subs.map(s => `<button class="dd__opt ${state.sub === s ? 'sel' : ''}" data-sub="${esc(s)}"><span>${esc(s)}</span><em>${cnt[s] || 0}</em></button>`).join('')}
+        ${c.subs.filter(s => cnt[s]).map(s => `<button class="dd__opt ${state.sub === s ? 'sel' : ''}" data-sub="${esc(s)}"><span>${esc(s)}</span><em>${cnt[s] || 0}</em></button>`).join('')}
       </div></div>`;
     }
     sub = `<div class="dd"><button class="pill ${state.sub ? 'on' : ''}" data-dd="sub"><span class="pill__label">${state.sub ? esc(state.sub) : 'Подраздел'}</span>${state.sub ? '<i class="pill__x" data-sub="" title="Сбросить">×</i>' : caret}</button>${menu}</div>`;
@@ -314,24 +333,20 @@ function renderCatalog() {
     return;
   }
 
-  // Главная: рекомендации (случайные товары с фото, на время визита) + подборки по разделам
-  if (!RECS) {
-    const pool = PRODUCTS.filter(p => p.img && stockOf(p) > 0);
-    RECS = [];
-    for (let i = 0; i < 10 && pool.length; i++) RECS.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-  }
-  let html = `<section class="section"><div class="section__head"><h2 class="section__title">Рекомендации для вас</h2></div><div class="grid">${RECS.map(cardHTML).join('')}</div></section>`;
+  const recs = recommendations.pick('home', list.filter(p => stockOf(p) > 0), 10);
+  let html = `<section class="section"><div class="section__head"><h2 class="section__title">Рекомендации для вас</h2></div><div class="grid">${recs.map(cardHTML).join('')}</div></section>`;
   CATEGORIES.forEach(c => {
-    const items = list.filter(p => p.cat === c.id && p.img && stockOf(p) > 0).sort((a, b) => b.popularity - a.popularity);
+    const items = recommendations.pick('row:' + c.id, list.filter(p => p.cat === c.id && stockOf(p) > 0 && !recs.includes(p)), 12);
     if (!items.length) return;
     html += `<section class="section"><div class="section__head"><h2 class="section__title">${c.name}</h2><button class="section__more" data-cat="${c.id}">Все${svgI('chev', 15)}</button></div><div class="hrow">${items.slice(0, 12).map(cardHTML).join('')}</div></section>`;
   });
   root.innerHTML = html;
 }
 
-let RECS = null;
+
 function catItems() {
-  return [{ id: 'all', name: 'Все товары', icon: 'cart' }, ...CATEGORIES];
+  const available = new Set(PRODUCTS.filter(p => state.store === null || p.offers.some(o => o[0] === state.store)).map(p => p.cat));
+  return [{ id: 'all', name: 'Все товары', icon: 'cart' }, ...CATEGORIES.filter(c => available.has(c.id))];
 }
 function renderCats() {
   $$('[data-fav-count]').forEach(b => { b.hidden = !state.favs.length; b.textContent = state.favs.length; });
@@ -373,7 +388,7 @@ function renderAccount() {
         <a class="acc__row" href="#/about">${iconBox('info', 'acc__tile')}<span class="acc__text"><b>О сервисе</b></span>${icoChev}</a>
       </div>
       ${state.user ? `<div class="acc__card"><button class="acc__row acc__logout" data-action="logout">${iconBox('signout', 'acc__tile')}<span class="acc__text"><b>Выйти из аккаунта</b></span></button></div>` : ''}
-      <div class="acc__foot"><div class="acc__brand">Mayr<b>Market</b></div><div>Версия 1.0</div></div>
+      <div class="acc__foot"><div class="acc__brand">Mayr<b>Market</b></div></div>
     </div>`;
 }
 function renderSettings() {
@@ -483,15 +498,12 @@ function renderAbout() {
     <div class="acc">
       <h1 class="acc__title">О сервисе</h1>
       <div class="acc__card acc__about">
-        <p><b>MayrMarket</b> — доставка продуктов по Грозному из магазинов города. Цены и наличие — как в самих магазинах.</p>
+        <p><b>MayrMarket</b>-Доставка продуктов в Грозном</p>
         <div class="acc__kv"><span>Магазины</span><b>${STORES.map(s => esc(s.name)).join(', ')}</b></div>
         <div class="acc__kv"><span>Часы доставки</span><b>${hours(pt)}</b></div>
         <div class="acc__kv"><span>Время доставки</span><b>${pt.eta}</b></div>
         <div class="acc__kv"><span>Доставка</span><b>${rub(pt.deliveryFee)}, от ${rub(pt.freeFrom)} бесплатно</b></div>
-        <div class="acc__kv"><span>Товаров в каталоге</span><b>${PRODUCTS.length.toLocaleString('ru-RU')}</b></div>
       </div>
-      <div class="acc__credit">Иконки: <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener">Uicons by Flaticon</a></div>
-      <div class="acc__foot"><div class="acc__brand">Mayr<b>Market</b></div><div>Версия 1.0</div></div>
     </div>`;
 }
 
@@ -697,15 +709,14 @@ function renderPoint() {
   $('#pointCity').textContent = STORES[state.store]?.name || 'Все магазины';
   const open = pt ? isOpen(pt) : false;
   $('#pointDot').classList.toggle('off', !open);
-  $('#pointMeta').textContent = pt
-    ? (state.address.street ? [state.address.street, state.address.house].filter(Boolean).join(', ') : (open ? `Сегодня до ${pad2(pt.hours[1])}:00 · ${pt.eta}` : `${opensToday(pt) ? 'Сегодня' : 'Завтра'} с ${pad2(pt.hours[0])}:00`))
-    : 'Грозный';
+  const address = [state.address.street, state.address.house].filter(Boolean).join(', ');
+  $('#pointMeta').textContent = [address || 'Указать адрес', pt?.eta].filter(Boolean).join(' · ');
+
 }
 
 
 function openPoints() {
-  let sel = state.point || POINTS[0].id;
-  let mode = state.mode;
+  const sel = state.point || POINTS[0].id;
   let selectedStore = state.store;
   const draw = () => {
     $('#modal').className = 'modal show';
@@ -725,37 +736,29 @@ function openPoints() {
           </div>
           ${POINTS.map(p => {
             const open = isOpen(p);
-            return `<button class="pt ${p.id === sel ? 'active' : ''}" data-pick="${p.id}">
+            return `<div class="pt ${p.id === sel ? 'active' : ''}" data-pick="${p.id}">
               <span class="pt__city">${p.city}</span>
               <span class="pt__addr">Доставка по Грозному</span>
               <span class="pt__eta">${p.eta}<small class="pt__badge ${open ? '' : 'closed'}">${open ? 'Открыто' : 'Закрыто'}</small></span>
               <span class="pt__info">${hours(p)} · доставка ${rub(p.deliveryFee)}, от ${rub(p.freeFrom)} бесплатно${p.minOrder ? ` · заказ от ${rub(p.minOrder)}` : ''}</span>
-            </button>`;
+            </div>`;
           }).join('')}
-          <button class="btn btn--primary btn--block" data-confirm-point>Готово</button>
         </div>
       </div>`;
   };
   draw();
   showOverlay();
   $('#modal').onclick = e => {
-    const pick = e.target.closest('[data-pick]'), m = e.target.closest('[data-mode]');
     const option = e.target.closest('[data-store]');
     if (option) {
       const index = Number(option.dataset.store);
       selectedStore = index < 0 ? null : index;
-      draw();
-      $('#modal [aria-pressed="true"]').focus({preventScroll: true});
-    }
-    else if (pick) { sel = pick.dataset.pick; draw(); }
-    else if (m) { mode = m.dataset.mode; draw(); }
-    else if (e.target.closest('[data-confirm-point]')) {
       const changed = state.point && state.point !== sel;
       if (state.store !== selectedStore) {
-        state.store = selectedStore; state.limit = 60; state.sub = null; state.dd = null;
+        state.store = selectedStore; state.cat = 'all'; state.query = ''; state.sort = 'pop'; state.filters.clear(); state.limit = 60; state.sub = null; state.dd = null;
       }
       LS.set('catalogStore', state.store);
-      state.point = sel; state.mode = mode; save();
+      state.point = sel; save();
       closeAll(); renderAll();
       const bad = cartLines().filter(l => !l.ok).length;
       if (changed && bad) toast(`${bad} ${plural(bad, 'товар недоступен', 'товара недоступны', 'товаров недоступны')}`);
@@ -813,7 +816,8 @@ function renderCart() {
 /* ================= Product modal ================= */
 function openProduct(id) {
   const p = byId[id], c = catById[p.cat];
-  const related = PRODUCTS.filter(x => x.cat === p.cat && x.id !== p.id && stockOf(x) > 0).sort((a, b) => (b.sub === p.sub) - (a.sub === p.sub) || (!!b.img - !!a.img) || b.popularity - a.popularity).slice(0, 4);
+  recommendations.learn(p.cat, 1);
+  const related = recommendations.pick('related:' + state.store + ':' + id, PRODUCTS.filter(x => x.cat === p.cat && x.id !== p.id && stockOf(x) > 0 && (state.store === null || x.offers.some(o => o[0] === state.store))), 4);
   const s = stockOf(p);
   const m = $('#modal');
   m.className = 'modal';
@@ -1190,16 +1194,15 @@ async function placeOrder(f, addressPhotos, photos) {
   const t = totals();
   if (!t.minOk || !t.okLines.length) { location.hash = '#/cart'; return; }
   const createdAt = Date.now();
-  const suffix = crypto.getRandomValues(new Uint32Array(1))[0] % 100000;
-  const id = String(Math.floor(createdAt / 1000)) + String(suffix).padStart(5, '0');
+  let id;
   const order = {
     id, createdAt, point: state.point, mode: f.pickup ? 'pickup' : 'delivery', via: 'tg',
     items: t.okLines.map(l => ({ id: l.p.id, name: l.p.name, qty: l.qty, price: l.p.price, offers: l.p.offers })),
     total: t.total + (f.pickup ? 0 : f.tip), pay: f.pay, slot: f.slot,
     address: f.pickup ? 'Самовывоз' : `${f.street.trim()}${f.kind === 'flat' && f.apt ? ', кв. ' + f.apt : ''}`
   };
-  order.text = orderMessage(order, f, t);
   const finish = () => {
+    for (const item of order.items) recommendations.learn(byId[item.id]?.cat, 6);
     state.orders.unshift(order);
     const rv = LS.get('reserved', {}), now = Date.now();
     for (const item of order.items) {
@@ -1221,6 +1224,12 @@ async function placeOrder(f, addressPhotos, photos) {
   btn.disabled = true;
   status.textContent = 'Отправляем заказ…';
   try {
+    const allocation = await fetch('https://mayrmarket-order-test.zanyburl3.chatgpt.site/order-number', {method:'POST', signal:AbortSignal.timeout(15000)});
+    if (!allocation.ok) throw new Error('Не удалось получить номер заказа. Попробуйте ещё раз.');
+    id = (await allocation.json()).number;
+    if (!/^(?:[1-9]\d{5}|[1-9]\d{7})$/.test(id)) throw new Error('Не удалось получить номер заказа.');
+    order.id = id;
+    order.text = orderMessage(order, f, t);
     const card = await orderCardImage(order, t.okLines);
     if (!card) throw new Error('Не удалось собрать карточку товаров.');
     const pictures = photos.length ? await Promise.all(photos.map(shrinkPhoto)) : addressPhotos;
@@ -1410,8 +1419,10 @@ function toast(msg, action) {
 /* ================= Events ================= */
 function goCatalog(cat) {
   if (state.route === 'catalog') rememberScroll();
+  if (cat !== 'all') recommendations.learn(cat, 1);
+  else if (state.cat !== 'all') recommendations.refresh();
   state.cat = cat; state.sub = null; state.dd = null;
-  state.query = ''; $('#searchInput').value = '';
+  state.query = '';
   const m = scrollMem[pageKey()]; state.limit = m ? m.limit : 60;   // раздел, где уже были, открывается на том же месте
   if (state.route !== 'catalog') { location.hash = '#/'; return; }
   renderPage();
@@ -1434,6 +1445,7 @@ document.addEventListener('click', e => {
   if ((x = el('[data-remove]'))) { delete state.cart[x.dataset.remove]; save(); renderCart(); refreshQty(x.dataset.remove); return; }
   if ((x = el('[data-fav]'))) {
     const id = x.dataset.fav;
+    if (!isFav(id)) recommendations.learn(byId[id]?.cat, 4);
     state.favs = isFav(id) ? state.favs.filter(f => f !== id) : [id, ...state.favs];
     save(); syncFav(id);
     if (state.route === 'favorites' && !$('#modal').classList.contains('show')) renderFavorites();
@@ -1483,7 +1495,7 @@ document.addEventListener('click', e => {
     }
     if (a === 'remove-bad') { cartLines().filter(l => !l.ok).forEach(l => l.avail ? state.cart[l.p.id] = l.avail : delete state.cart[l.p.id]); save(); renderAll(); }
     if (a === 'checkout') openCheckout();
-    if (a === 'reset') { state.store = null; LS.set('catalogStore', null); renderPoint(); state.filters.clear(); state.sub = null; state.query = ''; $('#searchInput').value = ''; goCatalog('all'); }
+    if (a === 'reset') { state.filters.clear(); state.sub = null; if (state.route === 'results') { searchDraft = state.query; location.hash = '#/search'; } else goCatalog('all'); }
     if (a === 'clear-favs') {
       const backup = [...state.favs];
       state.favs = []; save(); renderPage();
@@ -1523,15 +1535,71 @@ let searchT;
   window.addEventListener('hashchange', () => setTimeout(fit, 0));
   if (document.fonts) document.fonts.ready.then(fit);
 })();
-$('#searchInput').addEventListener('input', e => {
+function historyKey() { return 'searchHistory:' + (state.store ?? 'all'); }
+function renderSearch() {
+  $('#page').innerHTML = `<form class="query-bar" id="queryForm">
+    <label class="search query-field">${svgI('search', 20)}<input id="queryDraft" type="search" maxlength="120" enterkeyhint="search" placeholder="Найти товар" aria-label="Найти товар" autocomplete="off"></label>
+    <button type="button" class="query-cancel" data-cancel-search>Отмена</button></form><div id="suggestions"></div>`;
+  const field = $('#queryDraft');
+  field.value = searchDraft;
+  field.focus({preventScroll:true});
+  updateSuggestions();
+}
+function updateSuggestions() {
+  const target = $('#suggestions');
+  if (!target) return;
+  const term = searchDraft.trim();
+  const submit = v => `<button data-query="${esc(v)}">${esc(v)}</button>`;
+  if (!term) {
+    const history = LS.get(historyKey(), []);
+    target.innerHTML = history.length ? `<div class="query-heading">История <button data-clear-history>Очистить</button></div><div class="query-chips">${history.map(submit).join('')}</div>` : '';
+    return;
+  }
+  const {rows,chips,categories} = lookup(term);
+  const suggestions = [term,...chips.map(word=>term+' '+word)];
+  target.innerHTML = `<div class="query-chips">${chips.map(w=>`<button data-append="${esc(w)}">${esc(w)}</button>`).join('')}</div>
+    <div class="query-list">${suggestions.map(submit).join('')}</div>
+    ${rows.length ? `<h2 class="query-heading">Перейти в раздел</h2><div class="query-chips">${categories.map(id=>`<button data-search-category="${esc(id)}">${ic(catById[id].icon,'')}${esc(catById[id].name)}</button>`).join('')}</div>` : ''}`;
+}
+function submitQuery(raw) {
+  const term = raw.trim().slice(0,120);
+  if (!term) return;
+  searchDraft = term;
+  LS.set(historyKey(), [term,...LS.get(historyKey(),[]).filter(t=>t.toLowerCase()!==term.toLowerCase())].slice(0,12));
+  const top = lookup(term).rows[0];
+  if (top) recommendations.learn(top.cat, 1);
+  state.cat = 'all'; state.sub = null; state.filters.clear(); state.sort = 'pop'; state.limit = 60;
+  location.hash = '#/results?q=' + encodeURIComponent(term);
+}
+document.addEventListener('input', e => {
+  if (e.target.id !== 'queryDraft') return;
+  searchDraft = e.target.value;
   clearTimeout(searchT);
-  searchT = setTimeout(() => {
-    state.query = e.target.value.trim();
-    state.limit = 60;
-    if (state.query) { state.cat = 'all'; state.sub = null; }
-    if (state.route !== 'catalog') { location.hash = '#/'; return; }
-    renderPage();
-  }, 200);
+  searchT = setTimeout(updateSuggestions, 70);
+});
+document.addEventListener('submit', e => {
+  if (e.target.id === 'queryForm') { e.preventDefault(); submitQuery(searchDraft); }
+});
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.id === 'searchInput' || btn.hasAttribute('data-edit-query')) {
+    searchDraft = state.query;
+    if (state.route === 'results' && history.state?.fromSearch) history.back();
+    else location.hash = '#/search';
+  } else if (btn.hasAttribute('data-cancel-search')) {
+    location.hash = '#/';
+  } else if (btn.hasAttribute('data-clear-history')) {
+    LS.set(historyKey(),[]); updateSuggestions();
+  } else if (btn.dataset.append) {
+    searchDraft = (searchDraft.trim() + ' ' + btn.dataset.append).slice(0,120);
+    $('#queryDraft').value = searchDraft;
+    $('#queryDraft').focus(); updateSuggestions();
+  } else if (btn.dataset.query) {
+    submitQuery(btn.dataset.query);
+  } else if (btn.dataset.searchCategory) {
+    state.filters.clear(); state.sort = 'pop'; goCatalog(btn.dataset.searchCategory);
+  }
 });
 
 function renderAll() {
@@ -1543,5 +1611,7 @@ function renderAll() {
 parseRoute();
 renderAll();
 if (!state.point) openPoints();
+if ('requestIdleCallback' in window) requestIdleCallback(() => { searchIndex ||= createProductSearch(PRODUCTS); });
+
 window.__CATALOG_OK = PRODUCTS.length;
 })();

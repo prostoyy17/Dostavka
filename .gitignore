@@ -12,3 +12,10 @@ node_modules/
 __pycache__/
 *.log
 tmp/
+
+# Local Xcode and simulator outputs
+ios/build/
+ios/output/
+ios/attachments/
+ios/*.xcodeproj/
+ios/*.xcresult/

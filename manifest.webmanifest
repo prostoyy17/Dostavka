@@ -1,5 +1,5 @@
 {
-  "name": "MayrMarket — доставка продуктов",
+  "name": "MayrMarket-Доставка продуктов в Грозном",
   "short_name": "MayrMarket",
   "start_url": "./",
   "scope": "./",
@@ -20,5 +20,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "description": "MayrMarket-Доставка продуктов в Грозном"
 }
