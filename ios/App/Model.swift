@@ -56,22 +56,28 @@ func phoneDigits(_ s: String) -> String {
     }
     let file = URL.documentsDirectory.appending(path: "native-market.json")
     var recs: [Item]
-    var digest = "cd853e38528981f77db2dd90b8c9454aa87b3809d4af6cbc6f66a651993f89ea"
-    init() {
+    var digest: String
+    nonisolated static func startupCatalog() throws -> LiveCatalog.Snapshot {
+        if let data = try? Data(contentsOf: LiveCatalog.cacheURL),
+           let cached = try? JSONDecoder().decode(LiveCatalog.Snapshot.self, from: data) {
+            return cached
+        }
+        guard let url = Bundle.main.url(forResource: "market", withExtension: "json") else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let bundled = try JSONDecoder().decode(Catalogue.self, from: Data(contentsOf: url))
+        return LiveCatalog.Snapshot(digest: "cd853e38528981f77db2dd90b8c9454aa87b3809d4af6cbc6f66a651993f89ea", catalog: bundled)
+    }
+
+    init(snapshot: LiveCatalog.Snapshot) {
         for w in [400, 500, 600, 700, 800] {
             if let u = Bundle.main.url(forResource: "Onest\(w)", withExtension: "ttf") {
                 CTFontManagerRegisterFontsForURL(u as CFURL, .process, nil)
             }
         }
-        let url = Bundle.main.url(forResource: "market", withExtension: "json")!
-        let cached = (try? Data(contentsOf: LiveCatalog.cacheURL)).flatMap {
-            try? JSONDecoder().decode(LiveCatalog.Snapshot.self, from: $0)
-        }
-        let source = cached?.catalog ?? (try! JSONDecoder().decode(Catalogue.self, from: Data(contentsOf: url)))
+        let source = snapshot.catalog
         let catalog = Catalogue(items: source.items.filter { !$0.photo.isEmpty }, categories: source.categories, stores: source.stores)
-        if let cached {
-            digest = cached.digest
-        }
+        digest = snapshot.digest
         self.catalog = catalog
         byID = Dictionary(uniqueKeysWithValues: catalog.items.map {
             ($0.id, $0)
