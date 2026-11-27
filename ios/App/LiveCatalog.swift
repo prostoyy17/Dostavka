@@ -65,6 +65,7 @@ enum LiveCatalog {
                 }
             }
             guard !sources.isEmpty else { throw URLError(.cannotParseResponse) }
+            guard !photo.isEmpty else { continue }
             let sub = (r[4] as? Int).flatMap {
                 dep.subs.indices.contains($0) ? dep.subs[$0] : nil
             } ?? ""

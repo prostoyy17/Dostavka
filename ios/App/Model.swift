@@ -56,7 +56,7 @@ func phoneDigits(_ s: String) -> String {
     }
     let file = URL.documentsDirectory.appending(path: "native-market.json")
     var recs: [Item]
-    var digest = "dd1fbe7fadd0dc7b5980c9820f423022343b140a5e350e529885d81382ce165e"
+    var digest = "cd853e38528981f77db2dd90b8c9454aa87b3809d4af6cbc6f66a651993f89ea"
     init() {
         for w in [400, 500, 600, 700, 800] {
             if let u = Bundle.main.url(forResource: "Onest\(w)", withExtension: "ttf") {
@@ -67,7 +67,8 @@ func phoneDigits(_ s: String) -> String {
         let cached = (try? Data(contentsOf: LiveCatalog.cacheURL)).flatMap {
             try? JSONDecoder().decode(LiveCatalog.Snapshot.self, from: $0)
         }
-        let catalog = cached?.catalog ?? (try! JSONDecoder().decode(Catalogue.self, from: Data(contentsOf: url)))
+        let source = cached?.catalog ?? (try! JSONDecoder().decode(Catalogue.self, from: Data(contentsOf: url)))
+        let catalog = Catalogue(items: source.items.filter { !$0.photo.isEmpty }, categories: source.categories, stores: source.stores)
         if let cached {
             digest = cached.digest
         }

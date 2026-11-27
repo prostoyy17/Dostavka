@@ -428,7 +428,13 @@ struct Checkout: View {
         }
         sending = true
         defer { sending = false }
-        let id = String(Int(Date().timeIntervalSince1970)) + String(format: "%05d", Int.random(in: 0 ... 99999))
+        let id: String
+        do {
+            id = try await reserveOrderNumber()
+        } catch {
+            self.error = "Не удалось получить номер заказа. Попробуйте ещё раз."
+            return
+        }
         let fullAddress = a.street + (a.flat ? ", кв. " + a.apt : "")
         let receipt = Receipt(id: id, at: Date(), lines: lines, total: shop.total, address: fullAddress, pay: pay)
         let delivery = scheduled ? time.formatted(Date.FormatStyle(
@@ -533,4 +539,20 @@ struct Checkout: View {
     guard let http = meta as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode),
           let receipt = try JSONSerialization.jsonObject(with: response) as? [String: Any],
           (receipt["received"] as? NSNumber)?.intValue ?? 0 > 0 else { throw URLError(.badServerResponse) }
+}
+
+private func reserveOrderNumber() async throws -> String {
+    #if DEBUG && targetEnvironment(simulator)
+    if ProcessInfo.processInfo.arguments.contains("-RecordShopping") { return "100001" }
+    #endif
+    var request = URLRequest(url: URL(string: "https://mayrmarket-order-test.zanyburl3.chatgpt.site/ios/order-number")!)
+    request.httpMethod = "POST"
+    request.timeoutInterval = 15
+    request.setValue("ios", forHTTPHeaderField: "X-Mayr-Client")
+    struct Reservation: Decodable { let number: String }
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+    let number = try JSONDecoder().decode(Reservation.self, from: data).number
+    guard [6, 8].contains(number.count), number.allSatisfy({ $0.isNumber }) else { throw URLError(.cannotParseResponse) }
+    return number
 }

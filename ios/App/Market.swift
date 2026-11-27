@@ -4,7 +4,7 @@ import SwiftUI
     @State private var shop = Shop()
     var body: some Scene {
         WindowGroup {
-            Market(shop: shop).environment(\.locale, Locale(identifier: "ru_RU")).environment(\.timeZone, cityZone)
+            LaunchIntro { Market(shop: shop) }.environment(\.locale, Locale(identifier: "ru_RU")).environment(\.timeZone, cityZone)
         }
     }
 }
@@ -30,7 +30,6 @@ struct Market: View {
     let shop: Shop
     @State var page = Page.catalog
     @State var panel: Panel?
-    @State var draftStore: Int?
     @State var category = "all"
     @State var query = ""
     @State var suggestions = SearchSuggestions()
@@ -278,7 +277,6 @@ struct Market: View {
     @ViewBuilder var catalogView: some View {
         VStack(alignment: .leading, spacing: 5) {
             Button {
-                draftStore = shop.memory.store
                 panel = .stores
             } label: {
                 HStack(spacing: 8) {

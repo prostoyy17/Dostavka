@@ -14,9 +14,20 @@ extension Market {
             switch kind {
             case .stores:
                 ForEach([-1] + Array(shop.catalog.stores.indices), id: \.self) { i in
-                    let selected = (draftStore ?? -1) == i
+                    let selected = (shop.memory.store ?? -1) == i
                     Button {
-                        draftStore = i < 0 ? nil : i
+                        let draftStore: Int? = i < 0 ? nil : i
+                        if shop.memory.store != draftStore {
+                    shop.memory.store = draftStore
+                    category = "all"
+                    query = ""
+                    sub = ""
+                    photoOnly = false
+                    kgOnly = false
+                    order = "Популярные"
+                    updateScope()
+                    }
+                    panel = nil
                     } label: {
                         HStack(spacing: 14) {
                             if i >= 0 {
@@ -51,24 +62,7 @@ extension Market {
                 }
                 Text("09:00–01:00 · доставка 200 ₽, от 3 000 ₽ бесплатно").font(type(12)).foregroundStyle(Color.muted)
                 }.padding(14).tile(.tintSoft, 16)
-                Button { if shop.memory.store != draftStore {
-                    shop.memory.store = draftStore
-                    category = "all"
-                    query = ""
-                    sub = ""
-                    photoOnly = false
-                    kgOnly = false
-                    order = "Популярные"
-                    updateScope()
-                    }
-                    panel = nil
-                } label: {
-                    Text("Готово").primaryAction()
-                }
             case .filters:
-                choice("Только с фото", photoOnly) { photoOnly.toggle()
-                    filter()
-                }
                 choice("Весовые товары", kgOnly) { kgOnly.toggle()
                     filter()
                 }
@@ -362,7 +356,6 @@ extension Market {
                     22,
                     800
                 ))
-                Text("Версия 1.0").font(type(13)).foregroundStyle(Color.muted)
             }.opacity(0.65).frame(maxWidth: .infinity)
         case .settings: header("Настройки")
             Toggle(isOn: $dark) {
@@ -373,14 +366,12 @@ extension Market {
         case .about:
             header("О сервисе")
             VStack(alignment: .leading, spacing: 14) {
-                Text("MayrMarket — доставка продуктов по Грозному из магазинов города.")
+                Text("MayrMarket-Доставка продуктов в Грозном")
                 pair("Магазины", shop.catalog.stores.joined(separator: ", "))
                 pair("Часы доставки", "09:00–01:00")
                 pair("Время доставки", "60–90 мин")
                 pair("Доставка", "200 ₽, от 3 000 ₽ бесплатно")
-                pair("Товаров в каталоге", "\(shop.catalog.items.count)")
             }.padding().tile()
-            Link("Иконки: Uicons by Flaticon", destination: URL(string: "https://www.flaticon.com/uicons")!)
         case .orders:
             header("Мои заказы")
             if shop.memory.orders.isEmpty {

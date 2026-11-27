@@ -13,7 +13,7 @@ const resource=path.join(ios,'App/Resources');
 const items=CATALOG.items.filter(r=>r[7]>0).map(([id,name,price,cat,sub,img,kg,stock,offers,large,old])=>{
  const photo=img || offers.map(([shop,sku])=>PHOTOS[shop+':'+sku]).find(Boolean) || '';
  return {id,name,price,cat,sub:CATALOG.cats.find(c=>c.id===cat).subs[sub] || '',photo,large:large||photo,kg:!!kg,stock,offers:offers.map(([store,,price])=>({store,price})),old:old||0};
-});
+}).filter(item=>item.photo);
 fs.writeFileSync(path.join(resource,'market.json'),JSON.stringify({items,categories:CATALOG.cats,stores:CATALOG.meta.stores.map(s=>s.name)}));
 function asset(name,file,data,template=false){
  const dir=path.join(assets,name+'.imageset'); fs.mkdirSync(dir,{recursive:true});
